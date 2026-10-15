@@ -1,0 +1,1205 @@
+# MASTER PROMPT: Build a Professional CapCut-Style Video Editor UI in Antigravity
+
+## 1. Your Role
+
+Act as a senior frontend engineer, product designer, and video-editing application architect.
+
+I am building a browser-based video editor using **React, TypeScript, and Remotion** in my existing project:
+
+`E:\remotion`
+
+I want you to build a polished, professional, desktop-first video editing interface inspired by the usability and workflow of CapCut Desktop, with the potential to evolve into a serious AI-powered video editor.
+
+This is not a landing page, dashboard, or static mockup. It must look and behave like actual editing software.
+
+The primary goal of this task is to create the **complete editor interface and its core interactions**, while preserving the existing video playback and rendering functionality.
+
+Think of the application as a combination of:
+
+- CapCut's approachable editing workflow.
+- DaVinci Resolve's organized workspace.
+- A modern dark desktop application's visual polish.
+- A future AI-assisted editing workflow for creators making educational videos, explainers, and social media content.
+
+Do not copy CapCut's branding, logo, or proprietary assets. Use its general interaction patterns as inspiration and establish our own visual identity.
+
+---
+
+## 2. First, Inspect the Existing Project
+
+Before modifying anything:
+
+1. Inspect the existing project structure.
+2. Read `package.json`, `src/index.ts`, `src/Root.tsx`, and `src/Composition.tsx`.
+3. Inspect any existing UI components, stylesheets, and application entry points.
+4. Confirm how `TEST.mp4` is loaded and how its duration is calculated.
+5. Confirm whether `@remotion/player` and the required dependencies are already installed.
+6. Check the Git status and existing commits.
+7. Identify the safest way to introduce a standalone editor interface without breaking the current Remotion composition.
+
+Before making changes, briefly tell me:
+- Which files you intend to create.
+- Which files you intend to modify.
+- How the new editor UI will be separated from the exported video.
+- How you will preserve the working version.
+
+Then proceed with implementation. Do not stop after writing a plan unless you encounter a genuinely blocking issue.
+
+**Important:** Preserve the existing working video and its correct full duration. Do not replace working functionality with a placeholder.
+
+---
+
+# 3. Product Vision
+
+The application should open directly into a video-editing workspace.
+
+The user should immediately understand:
+
+- Where their media files are.
+- Where the video preview is.
+- Where the timeline is.
+- How to select and edit clips.
+- Where to adjust video and audio properties.
+- Where to access AI tools.
+- How to play, pause, undo, redo, save, and eventually export a project.
+
+The interface should feel like a real desktop application, not a website pretending to be one.
+
+Prioritize a 1440 × 900 desktop viewport, while ensuring the layout also works at 1280 × 720 and larger desktop sizes.
+
+Use a desktop-first design. The initial milestone does not need a mobile editing interface.
+
+---
+
+# 4. Visual Design System
+
+## Overall aesthetic
+
+Create a sophisticated dark interface with a neutral charcoal background, subtle borders, compact controls, restrained accent colors, and excellent visual hierarchy.
+
+The editor should feel precise and professional without looking intimidating.
+
+### Color palette
+
+Use these as starting design tokens:
+
+- Main application background: `#111214`
+- Panel background: `#18191D`
+- Elevated panel background: `#202126`
+- Hover background: `#292B31`
+- Active/selected background: `#30333B`
+- Primary text: `#F3F4F6`
+- Secondary text: `#A1A4AE`
+- Muted text: `#717581`
+- Borders and separators: `#303238`
+- Primary accent: `#8B7CFF`
+- Accent hover: `#A196FF`
+- Success: `#55C995`
+- Warning: `#E9B86A`
+- Destructive action: `#F06C75`
+
+Use the accent color sparingly for selections, active tools, playhead highlights, and primary actions.
+
+Do not make the entire application purple. Most of the interface should remain neutral and dark.
+
+Use readable contrast. Timeline clips should have distinct colors by media type or track, but colors must remain muted enough to avoid visual clutter.
+
+### Typography
+
+Use a clean interface font such as Inter if already available. Otherwise, use a suitable system sans-serif font.
+
+Typography guidelines:
+
+- Application title: 14–16 px.
+- Main section labels: 12–14 px.
+- Standard controls: 12–13 px.
+- Secondary metadata: 10–12 px.
+- Important timecodes: use tabular numerals.
+- Avoid oversized headings inside the editing workspace.
+
+### Spacing and shapes
+
+- Use a consistent 4 px spacing scale.
+- Use 6–9 px corner radii for controls and panels.
+- Prefer thin separators over heavy borders.
+- Keep toolbars compact.
+- Use subtle hover transitions of approximately 100–180 ms.
+- Avoid excessive shadows, gradients, glassmorphism, and decorative effects.
+- Use consistent icon sizing, generally 14–18 px.
+
+Use an existing icon library if one is installed. If not, choose a lightweight, consistent icon solution only if necessary. Avoid mixing emoji, text symbols, and unrelated icon styles.
+
+Every icon-only button should have a tooltip and an accessible label.
+
+---
+
+# 5. Main Application Layout
+
+Create a full-height editor workspace divided into five primary regions:
+
+1. Top application bar.
+2. Left asset and tool sidebar.
+3. Central video preview.
+4. Right properties inspector.
+5. Bottom multitrack timeline.
+
+The central preview and timeline are the main working areas.
+
+Use CSS Grid and Flexbox to create a stable layout. The timeline should remain anchored to the bottom of the workspace, and the preview should use the remaining available space.
+
+A suggested layout:
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ APP BAR: Logo | Project | Undo/Redo | Save | AI | Export            │
+├───────────────┬──────────────────────────────┬──────────────────────┤
+│               │                              │                      │
+│ MEDIA / TOOLS │       VIDEO PREVIEW          │   PROPERTIES         │
+│               │                              │                      │
+│ Media         │       Playback Controls      │   Video / Audio      │
+│ Audio         │                              │   Transform          │
+│ Text          │                              │   Speed / Opacity    │
+│ Captions      │                              │   Clip Settings      │
+│ Transitions   │                              │                      │
+│ Effects       │                              │                      │
+├───────────────┴──────────────────────────────┴──────────────────────┤
+│ TIMELINE TOOLBAR: Edit Tools | Zoom | Snap | Track Controls          │
+├─────────────────────────────────────────────────────────────────────┤
+│ TIME RULER                                                           │
+│ V2  ─────────────── Overlay / Text Clips ────────────────────────── │
+│ V1  ──[ Video Clip A ]────[ Video Clip B ]───────────────────────── │
+│ A1  ──[ Audio Clip ]──────────────────────────────────────────────── │
+│ A2  ───────────────[ Sound Effect ]──────────────────────────────── │
+├─────────────────────────────────────────────────────────────────────┤
+│ Status | Playhead Time | Total Duration | Preview Information       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+This is a conceptual arrangement, not a requirement to use these exact dimensions.
+
+Use sensible minimum widths and allow panel resizing where practical. If the screen is too narrow, let the side panels collapse rather than squeezing every control until the interface becomes unusable.
+
+---
+
+# 6. Top Application Bar
+
+Create a compact top bar spanning the entire application.
+
+### Left section
+
+Include:
+
+- A custom application icon or simple typographic wordmark.
+- Application name: `Studio`.
+- Current project name, initially `Untitled Project`.
+- A small dropdown indicator next to the project name.
+
+Clicking the project name should open a small menu with options such as:
+
+- Rename project.
+- Duplicate project.
+- Project settings.
+
+Do not implement fake menu items that appear clickable but do nothing. If an action is outside the current scope, visibly disable it or provide a clear placeholder message.
+
+### Middle section
+
+Include:
+
+- Undo.
+- Redo.
+- A save-status indicator.
+- Optional project-dirty indicator.
+
+Undo and redo must operate on actual editing state, not just change their visual appearance.
+
+Use sensible disabled states when no action is available.
+
+### Right section
+
+Include:
+
+- An AI Assistant button with a subtle accent treatment.
+- A preview quality dropdown, if practical.
+- An Export button.
+
+The Export button should open a well-designed export settings modal or panel.
+
+For this milestone, the export interface may expose the existing Remotion rendering workflow if that workflow can be safely connected. If actual rendering cannot yet be triggered from the new interface, clearly indicate that export integration is not connected rather than pretending a render has completed.
+
+The header must remain uncluttered.
+
+---
+
+# 7. Left Sidebar: Media and Editing Tools
+
+The left panel is the resource area for the entire editor.
+
+At the top, create a vertical navigation strip or compact tab row containing:
+
+- Media.
+- Audio.
+- Text.
+- Captions.
+- Transitions.
+- Effects.
+- AI Tools.
+
+Use icons and concise labels.
+
+The selected section should have a clear active state. Switching sections should update the content panel without changing the main workspace layout.
+
+## 7.1 Media tab
+
+This is the most important left-panel section for the initial milestone.
+
+Include:
+
+- A `Media` heading.
+- An import button.
+- A search field.
+- A media-type filter, if practical.
+- A grid/list view toggle, if practical.
+- A scrollable media asset area.
+
+Media cards should display:
+
+- A thumbnail or video placeholder.
+- The file name.
+- Media type.
+- Duration for video/audio assets when available.
+- A compact overflow menu.
+
+Use the existing `public/TEST.mp4` as the initial imported asset.
+
+Display its real duration and file name. Do not use a hardcoded two-second duration.
+
+If thumbnail generation is not implemented, use a clean video thumbnail placeholder with a play icon or film-strip icon. Do not generate fake thumbnails that imply functionality exists.
+
+### Media interactions
+
+Implement these where feasible:
+
+- Selecting a media item highlights it.
+- Double-clicking a media item loads it into the preview, if compatible with the current editing model.
+- Dragging a media item to a compatible timeline track creates a clip.
+- Dragging a media item into the timeline should not merely animate a placeholder. It must create a real clip in application state.
+- The import button should open a file picker for supported media types where the browser environment allows it.
+
+When a file is imported, manage its browser object URL safely and revoke it when no longer needed.
+
+Do not assume arbitrary local Windows paths can be opened directly by a browser. Use file input, browser object URLs, or an appropriate project asset mechanism.
+
+Keep the existing `TEST.mp4` asset available as the default sample.
+
+## 7.2 Audio tab
+
+Create a consistent asset browser for audio files.
+
+Include:
+
+- Imported audio assets.
+- Audio file names and durations when known.
+- An import action.
+- A future-ready structure for sound effects and music.
+
+If no audio files exist, display a useful empty state with an import button.
+
+Do not fabricate a library of downloadable music or sound effects.
+
+## 7.3 Text tab
+
+Create a polished panel with text presets, such as:
+
+- Basic Title.
+- Subtitle.
+- Lower Third.
+- Section Heading.
+- Callout.
+
+Selecting a preset should provide an appropriate preview or a working insertion action if text clips are supported by the current timeline model.
+
+If text editing is not included in the first functional milestone, build the panel's visual structure but clearly mark unsupported insertion actions as unavailable.
+
+## 7.4 Captions tab
+
+Provide a future-ready caption workspace with:
+
+- Caption generation entry point.
+- Caption style presets.
+- Caption track information.
+- Language selection.
+
+Do not claim that speech recognition or automatic transcription is working unless an actual transcription implementation exists.
+
+## 7.5 Transitions and Effects tabs
+
+Design clean asset panels for transitions and effects.
+
+Include search, categories, and preview cards where appropriate.
+
+Avoid a large library of fake effects. A small number of clearly labelled sample controls is preferable to a visually impressive but nonfunctional catalogue.
+
+## 7.6 AI Tools tab
+
+Create a distinctive AI tools area with restrained accent styling.
+
+Organize the future tools into categories:
+
+**Script and Story**
+- Generate a script.
+- Improve a hook.
+- Create a shot list.
+
+**Editing Assistant**
+- Suggest cuts.
+- Remove silences.
+- Find important moments.
+- Create a rough edit.
+
+**Creator Tools**
+- Generate captions.
+- Suggest B-roll.
+- Create a voice-over plan.
+- Suggest background music.
+
+For this UI milestone, these controls may open an explanatory panel or show a message that AI integration is planned.
+
+Do not connect to a Gemini API, request API keys, or add AI backend code as part of this task.
+
+The AI panel should look like part of the same editing product, not a separate chatbot website.
+
+---
+
+# 8. Central Preview Monitor
+
+The central preview is the visual heart of the application.
+
+Use `@remotion/player` to render the actual video composition in a dedicated preview container.
+
+**The editor interface must not appear inside the exported video.**
+
+The player should be mounted in the standalone application shell. The Remotion composition itself should contain only the content intended for the final video.
+
+## Preview design
+
+Create a dark preview stage with:
+
+- A centered video frame.
+- A subtle background surrounding the frame.
+- Correct aspect-ratio handling.
+- A small preview toolbar.
+- A clear selection or focus treatment when appropriate.
+
+Initially, support the existing 1080 × 1920 vertical composition.
+
+The preview should fit within the available space without stretching, cropping unexpectedly, or distorting the video.
+
+If the user switches preview scaling modes, support options such as:
+
+- Fit.
+- 100%.
+- Fit to workspace, where appropriate.
+
+Do not force the preview to fill the entire panel if that would distort its aspect ratio.
+
+## Preview toolbar
+
+Include:
+
+- Current timecode.
+- Play/pause button.
+- Previous frame.
+- Next frame.
+- Playback speed selector, if practical.
+- Preview scaling control.
+- Fullscreen preview button, if practical.
+
+The timecode must correspond to the actual player position.
+
+## Playback requirements
+
+Implement:
+
+- Play.
+- Pause.
+- Seek through the timeline.
+- Frame stepping where supported.
+- Synchronization between the player, playhead, and timeline.
+
+The timeline playhead and preview must share the same editing state.
+
+Clicking or dragging the playhead should update the preview to the selected time.
+
+Selecting a timeline clip should select that clip in the properties panel.
+
+If multiple clips are eventually supported in the composition, the preview must reflect the actual sequence rather than always showing the original source file independently of the timeline.
+
+For the initial milestone, prioritize a functional single-video edit sequence with correct duration and playback.
+
+Do not create a decorative preview with an unrelated video element that is disconnected from the actual timeline.
+
+---
+
+# 9. Right Sidebar: Properties Inspector
+
+The right panel should display settings for the currently selected item.
+
+When no item is selected, show a clean empty state such as:
+
+`Select a clip to inspect its properties.`
+
+When a video clip is selected, display the following sections.
+
+## 9.1 Basic information
+
+- Clip name.
+- Media type.
+- Source duration.
+- Timeline start.
+- Clip duration.
+
+Where appropriate, display values in both frames and readable timecode.
+
+## 9.2 Transform
+
+Provide editable controls for:
+
+- Position X.
+- Position Y.
+- Scale.
+- Rotation.
+- Opacity.
+
+Use number inputs and, where appropriate, sliders.
+
+Changes must update the actual selected clip's state.
+
+Do not expose controls that have no effect on the preview or rendered output unless they are explicitly marked as unavailable.
+
+For the first milestone, implement only the properties that can be safely connected to the composition. Build the component architecture so that further properties can be added later.
+
+## 9.3 Speed
+
+Include a speed section with:
+
+- Speed value.
+- Reset button.
+- A clearly displayed default speed.
+
+Do not implement speed changes until they can be correctly reflected in the clip timing and playback.
+
+If speed control is not yet functional, disable it with a clear indication that it is planned.
+
+## 9.4 Audio
+
+For video clips containing audio, provide a future-ready section for:
+
+- Volume.
+- Mute.
+- Fade in.
+- Fade out.
+
+Only enable controls when they actually affect playback and rendering.
+
+## 9.5 Clip actions
+
+Include appropriate actions such as:
+
+- Rename.
+- Duplicate.
+- Delete.
+- Reset properties.
+
+Destructive actions should have sensible feedback.
+
+Avoid opening multiple unnecessary confirmation dialogs for simple reversible editing actions.
+
+## Inspector behavior
+
+- Selecting a clip updates the inspector.
+- Editing a property updates the selected clip.
+- Undo and redo restore previous property values.
+- Deleting the selected clip clears or updates the selection.
+- Switching between clips displays the appropriate values.
+
+Keep the inspector scrollable independently of the preview.
+
+---
+
+# 10. Timeline: The Most Important Editing Workspace
+
+The timeline should look and behave like an actual non-linear video editor.
+
+Do not treat it as a static row of colorful rectangles.
+
+Build it with a clear separation between:
+
+1. Timeline toolbar.
+2. Track headers.
+3. Time ruler.
+4. Timeline canvas.
+5. Playhead.
+6. Clip rendering and interaction layer.
+
+## 10.1 Timeline toolbar
+
+Include:
+
+- Selection tool.
+- Split tool.
+- Delete action.
+- Undo.
+- Redo.
+- Snapping toggle.
+- Zoom out.
+- Zoom slider or control.
+- Zoom in.
+- Fit timeline to content.
+- Optional track-height control.
+
+The active tool must be visually identifiable.
+
+Use tooltips for icon-only controls.
+
+Do not include tools that do nothing. If a feature is not implemented, either omit it or visibly disable it.
+
+## 10.2 Track headers
+
+Create a fixed-width track-header column on the left of the timeline.
+
+Support a structure that can eventually accommodate:
+
+- V2: Overlay video, titles, and graphics.
+- V1: Main video.
+- A1: Main audio.
+- A2: Music and sound effects.
+
+For the initial milestone, it is acceptable to start with one video track and one audio track, provided the architecture supports adding more.
+
+Each track header should display:
+
+- Track type or label.
+- Track icon.
+- Mute control for audio tracks.
+- Lock control, where implemented.
+- Visibility control for video tracks, where implemented.
+
+Track controls must affect the actual track state. Do not display interactive-looking controls that have no behavior.
+
+## 10.3 Time ruler
+
+Build a horizontal time ruler above the clips.
+
+It should display sensible time markers based on the current zoom level.
+
+For example:
+
+- At a wide zoom, show markers every 5 or 10 seconds.
+- At a closer zoom, show markers every 1 second.
+- At a very close zoom, show frame divisions where practical.
+
+Calculate positions from the timeline's time scale, not by manually positioning decorative labels.
+
+Clicking the ruler should seek the playhead.
+
+Dragging along the ruler should continuously update the playhead position.
+
+Keep the ruler aligned with the clip canvas.
+
+## 10.4 Timeline coordinate system
+
+Implement a consistent timeline coordinate model.
+
+Maintain a defined relationship between:
+
+- Timeline frame.
+- Timeline time in seconds.
+- Horizontal pixel position.
+- Current zoom level.
+
+Use the project's frame rate as the source of truth.
+
+Do not hardcode a conversion that only works at 30 fps without consulting the actual composition settings.
+
+For example, the timeline's pixel position should be calculated from the timeline frame and the current pixels-per-second or pixels-per-frame scale.
+
+Use one consistent coordinate system across:
+
+- Clip placement.
+- Playhead position.
+- Ruler markers.
+- Dragging.
+- Splitting.
+- Seeking.
+- Zooming.
+
+When the timeline is zoomed or scrolled, clips and the playhead must remain aligned.
+
+## 10.5 Clip appearance
+
+Design clips as compact, rounded rectangles with subtle borders.
+
+Video clips should have:
+
+- A distinct video color.
+- A visible clip name.
+- Optional thumbnail strip.
+- Duration information when space allows.
+- A selection outline.
+- Trim handles when selected, once trimming is implemented.
+
+Audio clips should have a different visual treatment and may display a waveform in a later milestone.
+
+If waveform generation is not implemented, use a clean audio-track background rather than inventing an inaccurate waveform.
+
+Clips must not overlap track headers or the time ruler.
+
+Use consistent heights and spacing across tracks.
+
+Long clip names should truncate gracefully.
+
+## 10.6 Clip selection
+
+Clicking a clip should:
+
+- Select it.
+- Highlight its border.
+- Update the right inspector.
+- Make the clip available for supported editing operations.
+
+Clicking empty timeline space should clear the selection where appropriate.
+
+Selection must be based on the actual clip ID, not merely on the clip's visual position.
+
+## 10.7 Drag to move clips
+
+Implement genuine drag-to-move behavior.
+
+A user should be able to select a clip and drag it horizontally to change its timeline position.
+
+Where supported, dragging vertically should move it to a compatible track.
+
+Requirements:
+
+- The clip should visibly follow the pointer.
+- The new position should be calculated from the timeline coordinate system.
+- The resulting timeline position should be stored in application state.
+- The preview should reflect the updated sequence.
+- Snapping should work when enabled.
+- Locked tracks should prevent incompatible moves.
+- Dragging should not accidentally select text or scroll the entire page.
+- The operation should be undoable.
+
+Use pointer events or an appropriate drag-and-drop implementation.
+
+Avoid a fake drag animation that does not modify the actual editing data.
+
+## 10.8 Splitting clips
+
+Implement a working split operation at the playhead.
+
+When a selected clip is split:
+
+- Create two clips with distinct IDs.
+- Preserve the original source media.
+- Preserve the correct source in-point and out-point for both resulting clips.
+- Preserve the combined duration.
+- Keep the clips in their appropriate timeline positions.
+- Update the preview.
+- Update selection sensibly.
+- Allow undo.
+
+Splitting must operate on the actual clip data, not just create two visual rectangles.
+
+If the playhead falls outside the selected clip's active interval, disable the split action or show clear feedback.
+
+## 10.9 Delete clips
+
+Allow deletion through:
+
+- The Delete button.
+- The Delete or Backspace key when a clip is selected.
+
+Do not delete a clip when the user is typing into a text input.
+
+Deleting a clip should update:
+
+- The editing state.
+- The timeline display.
+- The selection.
+- The preview.
+- Undo history.
+
+## 10.10 Timeline zoom
+
+Implement zoom in, zoom out, and fit-to-content.
+
+Zooming should change the timeline's horizontal scale without changing clip durations or positions in frame space.
+
+Keep the playhead or pointer position reasonably stable during zoom changes when practical.
+
+The timeline should remain usable with both short clips and longer videos.
+
+## 10.11 Timeline scrolling
+
+Allow horizontal scrolling when the full project does not fit in the visible timeline.
+
+The track headers should remain fixed while the timeline canvas scrolls horizontally.
+
+The time ruler should scroll in sync with the clips.
+
+Do not let the entire application shift sideways when the user scrolls the timeline.
+
+Vertical scrolling should be confined to the timeline track area when the number of tracks exceeds the available height.
+
+## 10.12 Snapping
+
+Add a functional snapping toggle.
+
+When snapping is enabled, clip movement should be able to align with relevant positions such as:
+
+- The playhead.
+- Other clip boundaries.
+- The timeline start.
+
+Show a subtle visual guide when snapping occurs.
+
+When snapping is disabled, allow free positioning at the frame level.
+
+## 10.13 Trim handles
+
+Structure the clip component so that trim handles can be added cleanly.
+
+If implemented in this milestone, support trimming the beginning and end of a clip while preserving the source media's in/out points and the correct timeline duration.
+
+Do not implement trimming by merely shrinking the clip rectangle while leaving the actual playback unchanged.
+
+If reliable trimming would make this milestone too large, prioritize selection, movement, splitting, deletion, and seeking first. Keep trimming as the next clearly identified feature.
+
+---
+
+# 11. Editing State Architecture
+
+Create a real application state model rather than storing editing information only in UI components.
+
+The editor should eventually support an editing structure similar to this:
+
+```ts
+type Clip = {
+  id: string;
+  assetId: string;
+  name: string;
+  type: "video" | "audio" | "image" | "text";
+  trackId: string;
+
+  // All timeline positions and durations use integer frames.
+  timelineStartFrame: number;
+  sourceStartFrame: number;
+  durationInFrames: number;
+
+  // Optional properties for future editing features.
+  playbackRate?: number;
+  volume?: number;
+  opacity?: number;
+};
+
+type Track = {
+  id: string;
+  type: "video" | "audio";
+  name: string;
+  muted?: boolean;
+  locked?: boolean;
+  visible?: boolean;
+};
+
+type EditorState = {
+  clips: Clip[];
+  tracks: Track[];
+  selectedClipId: string | null;
+  playheadFrame: number;
+  zoom: number;
+  snappingEnabled: boolean;
+};
+```
+
+Adapt the schema to the existing project when necessary. Do not create duplicate sources of truth.
+
+Use unique IDs for clips. Never use the array index as the identity of a clip.
+
+Use integer frames for timeline positions and durations wherever possible. Convert to seconds and pixels only when displaying or rendering the timeline.
+
+Keep the editing model independent from the UI layout.
+
+The same editing state should drive:
+
+- The timeline.
+- The preview.
+- The inspector.
+- The playhead.
+- Undo and redo.
+- Eventually, the export composition.
+
+Use a clear component structure and avoid putting the entire application into one enormous React component.
+
+---
+
+# 12. Undo, Redo, and Keyboard Shortcuts
+
+Implement a basic but reliable undo/redo system for editing operations.
+
+At minimum, support undo and redo for:
+
+- Moving a clip.
+- Splitting a clip.
+- Deleting a clip.
+- Changing supported clip properties.
+
+Use a history mechanism that avoids creating a new history entry for every pointer-movement event during one drag. A completed drag should normally count as one undoable action.
+
+Add these shortcuts where appropriate:
+
+- Space: Play or pause.
+- Delete or Backspace: Delete selected clip.
+- Ctrl+Z: Undo.
+- Ctrl+Shift+Z: Redo.
+- Ctrl+Y: Redo, if appropriate for the platform.
+- S: Split selected clip at the playhead, if no text input is focused.
+- Left Arrow: Previous frame.
+- Right Arrow: Next frame.
+- Ctrl+S: Save project state, if project saving is implemented.
+
+Prevent browser defaults from interfering with editor shortcuts when necessary.
+
+Never trigger editing shortcuts while the user is typing into an input, textarea, or editable field.
+
+Display keyboard shortcuts in tooltips where helpful.
+
+---
+
+# 13. Responsive Panel Behavior
+
+The editor should remain usable across common desktop screen sizes.
+
+At larger sizes:
+
+- Show the media panel, preview, inspector, and timeline simultaneously.
+
+At medium desktop sizes:
+
+- Reduce panel widths.
+- Allow the media panel or inspector to collapse.
+- Preserve enough space for the preview and timeline.
+
+At smaller widths:
+
+- Prefer collapsible sidebars.
+- Keep the central preview usable.
+- Avoid letting panels overlap.
+- Avoid horizontal overflow across the entire application.
+
+If practical, allow users to resize the left sidebar, inspector, and timeline vertically.
+
+Use sensible minimum and maximum dimensions.
+
+Panel resizing should not cause the video preview to become distorted or the timeline to lose its coordinate alignment.
+
+---
+
+# 14. Loading, Empty, and Error States
+
+Every panel should look intentional when it contains no data.
+
+Create polished states for:
+
+- No media imported.
+- No clip selected.
+- Empty audio library.
+- No text clips.
+- No effects available.
+- Preview loading.
+- Unsupported media.
+- Failed media loading.
+- Export unavailable.
+
+Use concise explanatory text and a clear next action.
+
+For example, the media panel can display:
+
+`Bring your footage into the project to get started.`
+
+Provide an Import Media action below it.
+
+Use a consistent approach to loading and error feedback.
+
+Avoid browser alert boxes for routine UI actions. Prefer small inline messages, tooltips, or toast notifications.
+
+Do not silently swallow errors.
+
+---
+
+# 15. Export Dialog Design
+
+Create a polished export dialog accessible from the top-right Export button.
+
+Include:
+
+- Output name.
+- Resolution.
+- Frame rate.
+- Format.
+- Estimated duration.
+- Export action.
+- Export status area.
+
+Initially, the dialog should support the existing composition's settings wherever possible.
+
+For the existing vertical composition, show the actual dimensions and frame rate rather than assuming a different format.
+
+If the Remotion render process can be integrated safely, connect the action to it.
+
+If browser-only rendering is not available through the existing architecture, do not fake a successful export. Explain which rendering integration is still required.
+
+Do not add a backend, cloud rendering service, or external account system during this UI milestone.
+
+---
+
+# 16. Component and File Organization
+
+Use a maintainable architecture.
+
+The following is a suggested structure, not a mandate to reorganize every existing file:
+
+```text
+E:\remotion
+├── public
+│   └── TEST.mp4
+├── src
+│   ├── index.ts
+│   ├── Root.tsx
+│   ├── Composition.tsx
+│   ├── editor
+│   │   ├── EditorApp.tsx
+│   │   ├── components
+│   │   │   ├── TopBar.tsx
+│   │   │   ├── MediaPanel.tsx
+│   │   │   ├── PreviewPanel.tsx
+│   │   │   ├── PropertiesPanel.tsx
+│   │   │   ├── Timeline.tsx
+│   │   │   ├── TimelineRuler.tsx
+│   │   │   ├── TimelineTrack.tsx
+│   │   │   ├── TimelineClip.tsx
+│   │   │   ├── PlaybackControls.tsx
+│   │   │   └── ExportDialog.tsx
+│   │   ├── state
+│   │   │   ├── editorTypes.ts
+│   │   │   ├── editorReducer.ts
+│   │   │   └── history.ts
+│   │   ├── hooks
+│   │   │   ├── useEditorState.ts
+│   │   │   └── useTimelineInteractions.ts
+│   │   └── styles
+│   │       ├── editor.css
+│   │       ├── timeline.css
+│   │       └── panels.css
+│   └── ...
+```
+
+Reuse existing files when that is cleaner. Do not create redundant files just to match this example.
+
+Keep the Remotion composition separate from the application shell.
+
+If a new browser application entry point is needed, implement it in a way that preserves the existing Remotion Studio entry point and render workflow.
+
+Avoid modifying `package.json` unless necessary. If a dependency is required, explain why before adding it.
+
+---
+
+# 17. Technical Requirements
+
+Use:
+
+- React.
+- TypeScript.
+- Remotion.
+- `@remotion/player`.
+- Existing installed dependencies wherever practical.
+- CSS Grid and Flexbox for layout.
+- A consistent component architecture.
+- A centralized editing state model.
+- Proper TypeScript types.
+
+Avoid:
+
+- Rewriting the project from scratch.
+- Replacing Remotion with another rendering engine.
+- Putting the editor interface inside the rendered composition.
+- Hardcoded clip coordinates that fail when zoom changes.
+- Fake controls.
+- Fake progress indicators.
+- Random decorative thumbnails.
+- Unnecessary dependencies.
+- Massive single-file components.
+- Unnecessary backend services.
+- A Gemini API integration during this task.
+- Changes that break the existing `TEST.mp4` playback.
+- Unnecessary changes to the existing video duration calculation.
+
+If a browser application bundler or entry point is needed, inspect the existing setup first and choose the smallest safe solution.
+
+Do not assume a standard Vite setup exists. Confirm the actual project configuration before making changes.
+
+---
+
+# 18. Implementation Priorities
+
+Build the interface in the following order.
+
+## Phase 1: Professional application shell
+
+Implement:
+
+- Full-screen dark editor layout.
+- Top bar.
+- Left sidebar.
+- Central preview.
+- Right properties inspector.
+- Bottom timeline.
+- Consistent typography, colors, spacing, and icons.
+- Responsive panel behavior.
+
+The interface should already look polished at this stage.
+
+## Phase 2: Real video preview
+
+Implement:
+
+- Remotion Player integration.
+- Existing `TEST.mp4` playback.
+- Correct video duration.
+- Play and pause.
+- Preview timecode.
+- A working relationship between preview time and playhead.
+
+Do not sacrifice existing playback functionality to achieve a visual redesign.
+
+## Phase 3: Real timeline model
+
+Implement:
+
+- Track and clip data structures.
+- Timeline ruler.
+- Correct clip positioning.
+- Clip selection.
+- Playhead seeking.
+- Zoom.
+- Horizontal scrolling.
+- Clip movement.
+- Splitting.
+- Deletion.
+- Undo and redo.
+
+## Phase 4: Inspector and supporting panels
+
+Implement:
+
+- Selected clip properties.
+- Functional controls for supported properties.
+- Media import.
+- Dragging media into the timeline.
+- Empty states.
+- Audio and text panel foundations.
+- Tooltips and keyboard shortcuts.
+
+## Phase 5: Export foundation
+
+Implement the export settings interface and connect it to the existing rendering architecture if safely possible.
+
+Document anything that remains incomplete.
+
+Do not spend time building advanced effects, automatic captions, AI generation, or audio mixing before the core editor works.
+
+---
+
+# 19. Quality Assurance Checklist
+
+Before declaring the task complete, test the actual application.
+
+### Visual quality
+
+- The interface resembles a professional desktop video editor.
+- Panels align correctly.
+- The preview has the correct aspect ratio.
+- The timeline has a clear hierarchy.
+- No unwanted horizontal page scrolling exists.
+- Buttons have hover, active, disabled, and focus states.
+- Text remains legible.
+- The layout does not collapse at common desktop resolutions.
+
+### Functional quality
+
+- The editor opens through the intended application entry point.
+- `TEST.mp4` plays correctly.
+- The full duration is preserved.
+- The preview controls work.
+- The timeline playhead seeks correctly.
+- Selecting a clip updates the inspector.
+- Moving a clip updates the actual editing state.
+- Splitting creates two valid clips.
+- Deleting removes the selected clip.
+- Undo and redo restore the correct state.
+- Zoom does not change the underlying clip positions.
+- Snapping works when enabled, if implemented.
+- Keyboard shortcuts do not interfere with text inputs.
+- Imported media can be used according to the implemented workflow.
+
+### Rendering quality
+
+- The editor UI is not included in the exported video.
+- The Remotion composition remains renderable.
+- Existing duration calculation still works.
+- The composition receives the correct editing data wherever timeline editing has been connected.
+
+### Code quality
+
+Run:
+
+`npm run lint`
+
+If the project has relevant existing build or type-check scripts, run them too.
+
+Fix errors introduced by your changes. If a pre-existing error prevents a check from passing, report it separately instead of concealing it.
+
+Manually verify the important interactions in the running application. Do not claim that something has been tested if it has only been inspected in code.
+
+---
+
+# 20. Final Deliverable
+
+I expect a working application, not just a design description.
+
+When finished, provide a concise report covering:
+
+1. Files created and modified.
+2. How to launch the new editor.
+3. Which interactions work.
+4. Which features are only UI foundations.
+5. Whether video preview and duration were verified.
+6. Whether the timeline is connected to the actual editing model.
+7. Whether the exported composition remains free of editor UI.
+8. Results of linting and any other checks.
+9. The next three highest-priority improvements.
+
+Keep the current working Remotion project recoverable through Git.
+
+If a feature cannot be completed reliably in this milestone, explain the limitation and leave a clean architectural path for implementing it next.
+
+## Final instruction
+
+**Prioritize a beautiful, coherent, functional editing workspace over the number of features.**
+
+I want the first impression to be: “This looks like real editing software.”
+
+I want the first interaction to confirm it: “When I move a clip, split it, or change the playhead, the application actually responds.”
+
+Build the foundation carefully so that future capabilities such as AI-assisted editing, captions, B-roll placement, audio mixing, transitions, and automated video generation can be added without rebuilding the entire interface.
