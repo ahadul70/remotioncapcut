@@ -1,23 +1,14 @@
 import React from "react";
-import { Composition } from "remotion";
 import { MyComposition } from "./Composition";
-import { EditorApp } from "./editor/EditorApp";
 
+/**
+ * Root composition for Remotion Studio and CLI rendering.
+ * Keeps video output 100% clean and free of editor UI.
+ */
 export const RemotionRoot: React.FC = () => {
   return (
     <>
-      {/* Pristine video composition for export and clean rendering */}
       <MyComposition />
-
-      {/* CapCut-style desktop video editor workspace */}
-      <Composition
-        id="Editor"
-        component={EditorApp}
-        durationInFrames={300}
-        fps={30}
-        width={1440}
-        height={900}
-      />
     </>
   );
 };
