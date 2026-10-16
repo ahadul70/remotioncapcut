@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Img, random } from "remotion";
+import { random } from "remotion";
 import { MediaAsset, SidebarTab } from "../state/editorTypes";
 import { extractMediaMetadata, validateMediaFile } from "../utils/mediaUtils";
 
@@ -316,7 +316,8 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
                 >
                   <div className="media-thumb-area">
                     {asset.thumbnail ? (
-                      <Img
+                      // eslint-disable-next-line @remotion/warn-native-media-tag
+                      <img
                         src={asset.thumbnail}
                         alt={asset.name}
                         className="media-thumb-img"
