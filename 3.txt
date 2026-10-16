@@ -1,0 +1,72 @@
+Before you run it
+Create a Git checkpoint if your working tree is clean, or ask Antigravity to preserve any uncommitted work. Then implement only this milestone.
+Important technical detail: browser-local file imports need special handling for media URLs and rendering. Ask Antigravity to verify that the chosen approach works for both the preview and Remotion export, not just that the imported clip appears on the timeline.
+Once Step 3 works, we can move to multiple video/audio tracks, thumbnails, and waveforms, then start building AI editing on top of a real timelines
+
+# Step 3: Real Media Import and Drag-to-Timeline
+
+You are working on my existing React + TypeScript + Remotion video editor.
+
+## Objective
+Implement functional local video/audio import and drag-to-timeline placement using the existing editor architecture.
+
+## 1. Inspect before changing anything
+- Inspect the current project structure, package.json, editing state/reducer, timeline components, preview, composition, media panel, and existing tests.
+- Check Git status and recent commits.
+- Identify the existing clip schema and how preview/rendering consume it.
+- Preserve all working Step 2 functionality. Do not rewrite the project or introduce a second editing state system.
+
+## 2. Import local media
+- Allow users to import video and audio files through a file picker.
+- Support multiple files in one import.
+- Validate file types and show understandable errors for unsupported or unreadable files.
+- Display imported assets in the media panel with filename, media type, and duration when available.
+- Generate thumbnails only if this can be done reliably with the existing dependencies. Do not block core import functionality on thumbnails.
+- Use the existing metadata approach or inspect whether Mediabunny can reliably retrieve the required metadata.
+- Handle metadata failures and loading states gracefully.
+
+## 3. Drag media onto the timeline
+- Make media-bin assets draggable onto compatible timeline tracks.
+- Support dropping an asset at a timeline position calculated from the actual ruler scale, zoom, scroll offset, and drop location.
+- Create a new clip with a stable unique ID and valid integer-frame timing.
+- Preserve source media identity and source in/out timing.
+- Calculate duration from the actual media metadata and frame rate, without hardcoding TEST.mp4's duration.
+- Prevent invalid or negative durations.
+- Clearly indicate valid drop targets.
+- If native file drag-and-drop from Windows Explorer is practical, support it without breaking media-bin dragging. Otherwise, prioritize importing through the file picker.
+
+## 4. Integrate with existing functionality
+- Use the existing centralized editing state and reducer/actions.
+- Ensure imported clips work with existing selection, move, trim, split, delete, undo/redo, snapping, seeking, zoom, and inspector functionality.
+- Update preview and final rendering to use the same clip data.
+- Keep editor UI outside the rendered Remotion composition.
+- Preserve the current TEST.mp4 playback and duration behavior.
+- Ensure object URLs or other temporary media resources are managed safely and do not break during normal editing.
+- Do not add AI APIs, backend services, or unnecessary dependencies.
+
+## 5. Save scope and limitations
+For this milestone, media import and timeline placement are the priority. Do not implement cloud storage, project saving, transitions, AI editing, or advanced media management.
+If imported media cannot survive a page refresh because it is stored only in browser memory, document that limitation rather than pretending persistence exists.
+
+## 6. Testing
+Add or update tests for:
+- Metadata-to-frame duration conversion.
+- Creating clips from imported assets.
+- Valid source in/out and timeline timing.
+- Invalid or unsupported media.
+- Undoing and redoing a media placement.
+- Drop-position calculations with timeline zoom and horizontal scrolling.
+
+Run the available lint, type-check, build, and relevant automated tests. Fix failures caused by your changes.
+
+Report separately:
+1. Files changed.
+2. Features implemented.
+3. Commands run and their actual results.
+4. Any limitations or known bugs.
+5. Exact manual browser tests I should perform.
+
+Do not claim browser interactions or rendered output were verified unless you actually tested them.
+
+## Success criteria
+I can import a local video, see it in the media panel, drag it onto the timeline, preview it, move or trim it, split it, delete it, undo/redo those actions, and render it using the same editing state model. Existing Step 2 functionality must remain intact.
