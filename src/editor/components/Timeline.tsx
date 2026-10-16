@@ -87,6 +87,29 @@ export const Timeline: React.FC<TimelineProps> = ({
     window.addEventListener("pointerup", handlePointerUp);
   };
 
+  // Canvas click handler: deselect clips when clicking empty area, and seek to clicked horizontal position
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    // Don't deselect or seek if clicked inside a clip, ruler, or playhead
+    if (
+      target.closest(".timeline-clip") ||
+      target.closest(".time-ruler") ||
+      target.closest(".playhead-head") ||
+      target.closest(".trim-handle")
+    ) {
+      return;
+    }
+
+    onSelectClip(null);
+
+    if (scrollContainerRef.current) {
+      const rect = scrollContainerRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left + scrollContainerRef.current.scrollLeft;
+      const targetFrame = Math.max(0, Math.min(state.totalDurationInFrames, Math.round(clickX / state.zoom)));
+      onSeek(targetFrame);
+    }
+  };
+
   return (
     <footer className="timeline-workspace">
       {/* Timeline Toolbar */}
@@ -251,7 +274,7 @@ export const Timeline: React.FC<TimelineProps> = ({
         <div
           ref={scrollContainerRef}
           className="timeline-canvas-scroll-container"
-          onClick={() => onSelectClip(null)}
+          onClick={handleCanvasClick}
         >
           <TimelineRuler
             totalDurationInFrames={state.totalDurationInFrames}
@@ -292,6 +315,7 @@ export const Timeline: React.FC<TimelineProps> = ({
             <div
               className="playhead-head"
               onPointerDown={handlePlayheadPointerDown}
+              onClick={(e) => e.stopPropagation()}
               title="Drag playhead"
             />
           </div>

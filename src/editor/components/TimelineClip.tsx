@@ -152,11 +152,16 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
         width: `${widthPx}px`,
       }}
       onPointerDown={handleBodyPointerDown}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(clip.id);
+      }}
     >
       {/* Left Trim Handle */}
       <div
         className="trim-handle left"
         onPointerDown={handleLeftTrimPointerDown}
+        onClick={(e) => e.stopPropagation()}
         title="Drag to trim start"
       />
 
@@ -174,6 +179,7 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
       <div
         className="trim-handle right"
         onPointerDown={handleRightTrimPointerDown}
+        onClick={(e) => e.stopPropagation()}
         title="Drag to trim end"
       />
     </div>

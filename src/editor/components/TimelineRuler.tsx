@@ -88,6 +88,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
       className="time-ruler"
       style={{ width: `${totalWidthPx}px` }}
       onPointerDown={handlePointerDown}
+      onClick={(e) => e.stopPropagation()}
     >
       {ticks}
     </div>
