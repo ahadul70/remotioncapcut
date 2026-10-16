@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useReducer, useRef } from "react";
 import { PlayerRef } from "@remotion/player";
-import { staticFile } from "remotion";
+import { random, staticFile } from "remotion";
 import { Input, ALL_FORMATS, UrlSource } from "mediabunny";
 
 import { Clip, EditorState, HistorySnapshot, MediaAsset } from "./state/editorTypes";
@@ -13,6 +13,7 @@ import { PreviewPanel } from "./components/PreviewPanel";
 import { PropertiesPanel } from "./components/PropertiesPanel";
 import { Timeline } from "./components/Timeline";
 import { ExportDialog } from "./components/ExportDialog";
+import { createClipFromAsset, extractMediaMetadata } from "./utils/mediaUtils";
 
 import "./styles/editor.css";
 
@@ -222,44 +223,93 @@ export const EditorApp: React.FC = () => {
     [recordSnapshot, state.selectedClipId]
   );
 
-  // Add asset to timeline
+  // Add asset to timeline (supports target track and frame from drag-and-drop)
   const handleAddAssetToTimeline = useCallback(
-    (asset: MediaAsset) => {
+    (asset: MediaAsset, targetTrackId?: string, targetStartFrame?: number) => {
       recordSnapshot();
-      const newClipId = `clip-${Date.now().toString(36)}`;
-      const newClip: Clip = {
-        id: newClipId,
-        assetId: asset.id,
-        name: asset.name,
-        type: asset.type,
-        trackId: "track-v1",
-        timelineStartFrame: state.currentFrame,
-        sourceStartFrame: 0,
-        durationInFrames: asset.durationInFrames,
-        sourceDurationInFrames: asset.durationInFrames,
-        src: asset.src,
-        scale: 1,
-        positionX: 0,
-        positionY: 0,
-        rotation: 0,
-        opacity: 1,
-        volume: 1,
-      };
+
+      // Find compatible track
+      const targetTrack =
+        (targetTrackId && state.tracks.find((t) => t.id === targetTrackId)) ||
+        state.tracks.find((t) => (asset.type === "audio" ? t.type === "audio" : t.type === "video")) ||
+        state.tracks[0];
+
+      const startFrame =
+        targetStartFrame !== undefined
+          ? targetStartFrame
+          : playerRef.current
+          ? playerRef.current.getCurrentFrame()
+          : state.currentFrame;
+
+      const newClip = createClipFromAsset(asset, targetTrack.id, startFrame);
 
       dispatch({
         type: "RESTORE_SNAPSHOT",
         snapshot: {
           clips: [...state.clips, newClip],
           tracks: state.tracks,
-          selectedClipId: newClipId,
+          selectedClipId: newClip.id,
           totalDurationInFrames: Math.max(
             state.totalDurationInFrames,
-            state.currentFrame + asset.durationInFrames + 30
+            startFrame + asset.durationInFrames + 30
           ),
         },
       });
     },
-    [recordSnapshot, state.clips, state.tracks, state.currentFrame, state.totalDurationInFrames]
+    [recordSnapshot, state.tracks, playerRef, state.currentFrame, state.clips, state.totalDurationInFrames]
+  );
+
+  // Bulk import assets into state
+  const handleImportAssets = useCallback((newAssets: MediaAsset[]) => {
+    dispatch({ type: "ADD_ASSETS", assets: newAssets });
+  }, []);
+
+  // Dropping an asset onto a timeline track
+  const handleDropAsset = useCallback(
+    (trackId: string, frame: number, asset: MediaAsset) => {
+      handleAddAssetToTimeline(asset, trackId, frame);
+    },
+    [handleAddAssetToTimeline]
+  );
+
+  // Dropping external files onto a timeline track
+  const handleDropFiles = useCallback(
+    async (trackId: string, frame: number, fileList: FileList) => {
+      const files = Array.from(fileList);
+      let currentDropFrame = frame;
+      const importedAssets: MediaAsset[] = [];
+
+      for (const file of files) {
+        try {
+          const metadata = await extractMediaMetadata(file, state.fps);
+          const objectUrl = URL.createObjectURL(file);
+          const rand = random(null).toString(36).substring(2, 6);
+          const assetId = `asset-${Date.now().toString(36)}-${rand}`;
+          const asset: MediaAsset = {
+            id: assetId,
+            name: file.name,
+            type: metadata.type,
+            src: objectUrl,
+            durationInSeconds: metadata.durationInSeconds,
+            durationInFrames: metadata.durationInFrames,
+            width: metadata.width,
+            height: metadata.height,
+            fps: state.fps,
+            thumbnail: metadata.thumbnail,
+          };
+          importedAssets.push(asset);
+          handleAddAssetToTimeline(asset, trackId, currentDropFrame);
+          currentDropFrame += asset.durationInFrames;
+        } catch (err) {
+          console.error("Failed to import dropped file:", file.name, err);
+        }
+      }
+
+      if (importedAssets.length > 0) {
+        dispatch({ type: "ADD_ASSETS", assets: importedAssets });
+      }
+    },
+    [state.fps, handleAddAssetToTimeline]
   );
 
   // Keyboard shortcuts listener
@@ -358,9 +408,8 @@ export const EditorApp: React.FC = () => {
           activeTab={state.activeSidebarTab}
           onTabChange={(tab) => dispatch({ type: "SET_SIDEBAR_TAB", tab })}
           assets={state.assets}
-          onImportAsset={(asset) => {
-            dispatch({ type: "ADD_ASSET", asset });
-          }}
+          fps={state.fps}
+          onImportAssets={handleImportAssets}
           onAddAssetToTimeline={handleAddAssetToTimeline}
         />
 
@@ -408,6 +457,8 @@ export const EditorApp: React.FC = () => {
         onToggleMute={(trackId) => dispatch({ type: "TOGGLE_TRACK_MUTE", trackId })}
         onToggleLock={(trackId) => dispatch({ type: "TOGGLE_TRACK_LOCK", trackId })}
         onToggleVisible={(trackId) => dispatch({ type: "TOGGLE_TRACK_VISIBLE", trackId })}
+        onDropAsset={handleDropAsset}
+        onDropFiles={handleDropFiles}
       />
 
       {/* Export Dialog */}

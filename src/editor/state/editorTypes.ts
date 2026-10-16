@@ -50,6 +50,7 @@ export type MediaAsset = {
   width?: number;
   height?: number;
   fps: number;
+  thumbnail?: string;
 };
 
 export type EditorTool = "select" | "split" | "trim" | "delete";

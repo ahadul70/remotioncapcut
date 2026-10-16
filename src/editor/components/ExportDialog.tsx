@@ -84,6 +84,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ state, onClose }) =>
             >
               npx remotion render src/index.ts MyComp out/video.mp4
             </code>
+            <div style={{ marginTop: "8px", color: "var(--text-muted)", fontSize: "10px" }}>
+              * Note: Imported local files exist in browser session memory (Blob URLs). For offline terminal rendering with custom media, place files in the <code>public/</code> folder.
+            </div>
           </div>
         </div>
 

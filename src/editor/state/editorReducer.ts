@@ -27,7 +27,8 @@ export type Action =
   | { type: "RESTORE_SNAPSHOT"; snapshot: HistorySnapshot }
   | { type: "SET_TOTAL_DURATION"; duration: number }
   | { type: "RENAME_PROJECT"; name: string }
-  | { type: "ADD_ASSET"; asset: MediaAsset };
+  | { type: "ADD_ASSET"; asset: MediaAsset }
+  | { type: "ADD_ASSETS"; assets: MediaAsset[] };
 
 const DEFAULT_MIN_DURATION = 2319; // ~77s default timeline base (covers 2289f TEST.mp4 + 30f padding)
 
@@ -309,6 +310,13 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return {
         ...state,
         assets: [...state.assets, action.asset],
+      };
+    }
+
+    case "ADD_ASSETS": {
+      return {
+        ...state,
+        assets: [...state.assets, ...action.assets],
       };
     }
 

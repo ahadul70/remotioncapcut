@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { PlayerRef } from "@remotion/player";
-import { EditorState } from "../state/editorTypes";
+import { EditorState, MediaAsset } from "../state/editorTypes";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTrack } from "./TimelineTrack";
 import { useCurrentPlayerFrame } from "../hooks/useCurrentPlayerFrame";
@@ -26,6 +26,8 @@ type TimelineProps = {
   onToggleMute: (trackId: string) => void;
   onToggleLock: (trackId: string) => void;
   onToggleVisible: (trackId: string) => void;
+  onDropAsset?: (trackId: string, frame: number, asset: MediaAsset) => void;
+  onDropFiles?: (trackId: string, frame: number, files: FileList) => void;
 };
 
 export const Timeline: React.FC<TimelineProps> = ({
@@ -49,6 +51,8 @@ export const Timeline: React.FC<TimelineProps> = ({
   onToggleMute,
   onToggleLock,
   onToggleVisible,
+  onDropAsset,
+  onDropFiles,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -302,6 +306,9 @@ export const Timeline: React.FC<TimelineProps> = ({
               onCommitTrim={onCommitTrim}
               onCancelTrim={onCancelTrim}
               totalWidthPx={totalWidthPx}
+              allAssets={state.assets}
+              onDropAsset={onDropAsset}
+              onDropFiles={onDropFiles}
             />
           ))}
 

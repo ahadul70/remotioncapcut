@@ -18,7 +18,8 @@
     "eslint": "9.39.5",
     "prettier": "3.8.1",
     "typescript": "5.9.3",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "vitest": "^3.2.7"
   },
   "scripts": {
     "dev": "vite",
@@ -26,6 +27,7 @@
     "studio": "remotion studio",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc"
+    "lint": "eslint src && tsc",
+    "test": "vitest run"
   }
 }

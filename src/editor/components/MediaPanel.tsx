@@ -1,41 +1,119 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
+import { Img, random } from "remotion";
 import { MediaAsset, SidebarTab } from "../state/editorTypes";
+import { extractMediaMetadata, validateMediaFile } from "../utils/mediaUtils";
 
 type MediaPanelProps = {
   activeTab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
   assets: MediaAsset[];
-  onImportAsset: (asset: MediaAsset) => void;
+  fps: number;
+  onImportAssets: (assets: MediaAsset[]) => void;
   onAddAssetToTimeline: (asset: MediaAsset) => void;
+  onDragAssetStart?: (asset: MediaAsset) => void;
 };
 
 export const MediaPanel: React.FC<MediaPanelProps> = ({
   activeTab,
   onTabChange,
   assets,
-  onImportAsset,
+  fps,
+  onImportAssets,
   onAddAssetToTimeline,
+  onDragAssetStart,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importingCount, setImportingCount] = useState(0);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [isDragZoneActive, setIsDragZoneActive] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFiles = async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
 
-    const objectUrl = URL.createObjectURL(file);
-    const isVideo = file.type.startsWith("video");
+    setIsImporting(true);
+    setImportingCount(files.length);
+    const newErrors: string[] = [];
+    const newAssets: MediaAsset[] = [];
 
-    const newAsset: MediaAsset = {
-      id: `asset-${Date.now()}`,
-      name: file.name,
-      type: isVideo ? "video" : "audio",
-      src: objectUrl,
-      durationInSeconds: 10,
-      durationInFrames: 300,
-      fps: 30,
-    };
+    for (const file of files) {
+      const validation = validateMediaFile(file);
+      if (!validation.valid || !validation.mediaType) {
+        newErrors.push(validation.error || `Unsupported file format: ${file.name}`);
+        continue;
+      }
 
-    onImportAsset(newAsset);
+      try {
+        const metadata = await extractMediaMetadata(file, fps);
+        const objectUrl = URL.createObjectURL(file);
+        const rand = random(null).toString(36).substring(2, 6);
+        const assetId = `asset-${Date.now().toString(36)}-${rand}`;
+
+        newAssets.push({
+          id: assetId,
+          name: file.name,
+          type: metadata.type,
+          src: objectUrl,
+          durationInSeconds: metadata.durationInSeconds,
+          durationInFrames: metadata.durationInFrames,
+          width: metadata.width,
+          height: metadata.height,
+          fps,
+          thumbnail: metadata.thumbnail,
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : `Failed to import "${file.name}"`;
+        newErrors.push(message);
+      }
+    }
+
+    if (newAssets.length > 0) {
+      onImportAssets(newAssets);
+    }
+
+    if (newErrors.length > 0) {
+      setImportErrors((prev) => [...prev, ...newErrors]);
+    }
+
+    setIsImporting(false);
+    setImportingCount(0);
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(e.target.files);
+      e.target.value = "";
+    }
+  };
+
+  const handlePanelDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("Files")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      setIsDragZoneActive(true);
+    }
+  };
+
+  const handlePanelDragLeave = (e: React.DragEvent) => {
+    // Only deactivate if leaving the container itself
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragZoneActive(false);
+  };
+
+  const handlePanelDrop = (e: React.DragEvent) => {
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      e.preventDefault();
+      setIsDragZoneActive(false);
+      handleFiles(e.dataTransfer.files);
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
   return (
@@ -104,22 +182,20 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
           title="Transitions"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="12 2 2 7 12 12 22 7 12 2" />
-            <polyline points="2 17 12 22 22 17" />
-            <polyline points="2 12 12 17 22 12" />
+            <polygon points="12 2 2 22 22 22" />
           </svg>
-          <span>Transition</span>
+          <span>Transitions</span>
         </button>
 
         <button
           className={`nav-tab-btn ${activeTab === "effects" ? "active" : ""}`}
           onClick={() => onTabChange("effects")}
-          title="Video Effects"
+          title="Effects"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
-            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
-            <path d="M2 12h20" />
+            <path d="M8 12h8" />
+            <path d="M12 8v8" />
           </svg>
           <span>Effects</span>
         </button>
@@ -138,7 +214,12 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
       </nav>
 
       {/* Tab Content Pane */}
-      <div className="sidebar-content-pane">
+      <div
+        className="sidebar-content-pane"
+        onDragOver={handlePanelDragOver}
+        onDragLeave={handlePanelDragLeave}
+        onDrop={handlePanelDrop}
+      >
         {activeTab === "media" && (
           <>
             <div className="pane-header">
@@ -153,49 +234,135 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="video/*,audio/*"
+                multiple
+                accept="video/*,audio/*,.mp4,.webm,.mov,.mkv,.mp3,.wav,.aac,.ogg,.flac,.m4a"
                 style={{ display: "none" }}
-                onChange={handleFileChange}
+                onChange={handleFileInputChange}
               />
             </div>
 
-            {/* Asset cards */}
-            {assets.map((asset) => (
-              <div
-                key={asset.id}
-                className="media-card"
-                onDoubleClick={() => onAddAssetToTimeline(asset)}
-              >
-                <div className="media-thumb-area">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="1.5">
-                    <polygon points="23 7 16 12 23 17 23 7" />
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                  </svg>
-                  <span className="media-badge">
-                    {Math.floor(asset.durationInSeconds / 60)}:
-                    {String(Math.floor(asset.durationInSeconds % 60)).padStart(2, "0")}
-                  </span>
+            {/* Error notifications */}
+            {importErrors.length > 0 && (
+              <div className="media-error-banner">
+                <div style={{ flex: 1 }}>
+                  {importErrors.map((err, i) => (
+                    <div key={i} style={{ marginBottom: i < importErrors.length - 1 ? "4px" : "0" }}>
+                      • {err}
+                    </div>
+                  ))}
                 </div>
-                <div className="media-info">
-                  <div className="media-filename">{asset.name}</div>
-                  <div className="media-meta">
-                    {asset.type.toUpperCase()} • {asset.durationInFrames} frames • 30 fps
-                  </div>
-                  <button
-                    className="btn"
-                    style={{
-                      width: "100%",
-                      marginTop: "8px",
-                      fontSize: "11px",
-                      padding: "4px",
-                    }}
-                    onClick={() => onAddAssetToTimeline(asset)}
-                  >
-                    + Add to Timeline
-                  </button>
-                </div>
+                <button
+                  className="btn btn-icon"
+                  style={{ width: "18px", height: "18px", fontSize: "10px", lineHeight: "1" }}
+                  onClick={() => setImportErrors([])}
+                  title="Dismiss error"
+                >
+                  ✕
+                </button>
               </div>
-            ))}
+            )}
+
+            {/* Drop / Import Zone */}
+            <div
+              className={`media-drop-zone ${isDragZoneActive ? "active" : ""}`}
+              onClick={() => fileInputRef.current?.click()}
+              title="Click to import or drop files here"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: "0 auto 6px", display: "block", color: "var(--accent)" }}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <div style={{ fontSize: "11px", fontWeight: 500, color: "var(--text-primary)" }}>
+                {isDragZoneActive ? "Drop files to import" : "Drop files here or click to import"}
+              </div>
+              <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
+                Supports MP4, WebM, MOV, MP3, WAV, AAC
+              </div>
+            </div>
+
+            {/* Loading / Importing indicator */}
+            {isImporting && (
+              <div className="media-loading-indicator">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: "spin 1s linear infinite" }}>
+                  <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                </svg>
+                <span>Analyzing {importingCount} media file{importingCount > 1 ? "s" : ""}...</span>
+              </div>
+            )}
+
+            {/* Asset cards */}
+            <div className="media-asset-list">
+              {assets.map((asset) => (
+                <div
+                  key={asset.id}
+                  className="media-card"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(
+                      "application/json",
+                      JSON.stringify({
+                        type: "media-asset",
+                        assetId: asset.id,
+                        assetType: asset.type,
+                      })
+                    );
+                    e.dataTransfer.effectAllowed = "copy";
+                    if (onDragAssetStart) {
+                      onDragAssetStart(asset);
+                    }
+                  }}
+                  onDoubleClick={() => onAddAssetToTimeline(asset)}
+                  title="Drag onto timeline or double-click to add"
+                >
+                  <div className="media-thumb-area">
+                    {asset.thumbnail ? (
+                      <Img
+                        src={asset.thumbnail}
+                        alt={asset.name}
+                        className="media-thumb-img"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : asset.type === "video" ? (
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="1.5">
+                        <polygon points="23 7 16 12 23 17 23 7" />
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                      </svg>
+                    ) : (
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="1.5">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                      </svg>
+                    )}
+                    <span className="media-badge">
+                      {formatDuration(asset.durationInSeconds)}
+                    </span>
+                  </div>
+                  <div className="media-info">
+                    <div className="media-filename" title={asset.name}>{asset.name}</div>
+                    <div className="media-meta">
+                      {asset.type.toUpperCase()} • {asset.durationInFrames}f ({(asset.durationInFrames / fps).toFixed(1)}s)
+                    </div>
+                    <button
+                      className="btn"
+                      style={{
+                        width: "100%",
+                        marginTop: "8px",
+                        fontSize: "11px",
+                        padding: "4px",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddAssetToTimeline(asset);
+                      }}
+                    >
+                      + Add to Timeline
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </>
         )}
 
@@ -203,26 +370,119 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
           <div>
             <div className="pane-header">
               <span className="pane-title">Audio & Music</span>
-            </div>
-            <div style={{ textAlign: "center", padding: "30px 10px", color: "var(--text-muted)" }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: "0 auto 12px" }}>
-                <path d="M9 18V5l12-2v13" />
-                <circle cx="6" cy="18" r="3" />
-                <circle cx="18" cy="16" r="3" />
-              </svg>
-              <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "6px" }}>
-                Audio Library Ready
-              </p>
-              <p style={{ fontSize: "11px", marginBottom: "16px" }}>
-                Import your voice-over, background music, or SFX.
-              </p>
               <button
                 className="btn btn-primary"
-                onClick={() => fileInputRef.current?.click()}
+                style={{ fontSize: "11px", padding: "4px 8px" }}
+                onClick={() => audioFileInputRef.current?.click()}
               >
-                Import Audio File
+                + Import Audio
               </button>
+              <input
+                ref={audioFileInputRef}
+                type="file"
+                multiple
+                accept="audio/*,.mp3,.wav,.aac,.ogg,.flac,.m4a"
+                style={{ display: "none" }}
+                onChange={handleFileInputChange}
+              />
             </div>
+
+            {/* Error notifications */}
+            {importErrors.length > 0 && (
+              <div className="media-error-banner">
+                <div style={{ flex: 1 }}>
+                  {importErrors.map((err, i) => (
+                    <div key={i} style={{ marginBottom: i < importErrors.length - 1 ? "4px" : "0" }}>
+                      • {err}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  className="btn btn-icon"
+                  style={{ width: "18px", height: "18px", fontSize: "10px" }}
+                  onClick={() => setImportErrors([])}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Audio assets list */}
+            {assets.filter((a) => a.type === "audio").length > 0 ? (
+              <div className="media-asset-list">
+                {assets
+                  .filter((a) => a.type === "audio")
+                  .map((asset) => (
+                    <div
+                      key={asset.id}
+                      className="media-card"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(
+                          "application/json",
+                          JSON.stringify({
+                            type: "media-asset",
+                            assetId: asset.id,
+                            assetType: asset.type,
+                          })
+                        );
+                        e.dataTransfer.effectAllowed = "copy";
+                        if (onDragAssetStart) {
+                          onDragAssetStart(asset);
+                        }
+                      }}
+                      onDoubleClick={() => onAddAssetToTimeline(asset)}
+                    >
+                      <div className="media-thumb-area" style={{ height: "60px", background: "rgba(52, 211, 153, 0.1)" }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="1.5">
+                          <path d="M9 18V5l12-2v13" />
+                          <circle cx="6" cy="18" r="3" />
+                          <circle cx="18" cy="16" r="3" />
+                        </svg>
+                        <span className="media-badge">
+                          {formatDuration(asset.durationInSeconds)}
+                        </span>
+                      </div>
+                      <div className="media-info">
+                        <div className="media-filename" title={asset.name}>{asset.name}</div>
+                        <div className="media-meta">
+                          AUDIO • {asset.durationInFrames}f ({(asset.durationInFrames / fps).toFixed(1)}s)
+                        </div>
+                        <button
+                          className="btn"
+                          style={{ width: "100%", marginTop: "6px", fontSize: "11px", padding: "4px" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAddAssetToTimeline(asset);
+                          }}
+                        >
+                          + Add to Audio Track
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "30px 10px", color: "var(--text-muted)" }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: "0 auto 12px" }}>
+                  <path d="M9 18V5l12-2v13" />
+                  <circle cx="6" cy="18" r="3" />
+                  <circle cx="18" cy="16" r="3" />
+                </svg>
+                <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "6px" }}>
+                  Audio Library Ready
+                </p>
+                <p style={{ fontSize: "11px", marginBottom: "16px" }}>
+                  Import your voice-over, background music, or SFX.
+                </p>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => audioFileInputRef.current?.click()}
+                >
+                  Import Audio File
+                </button>
+              </div>
+            )}
           </div>
         )}
 

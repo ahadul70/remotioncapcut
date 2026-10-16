@@ -5,6 +5,7 @@ import {
   Composition,
   Sequence,
   Video,
+  Audio,
   staticFile,
 } from "remotion";
 import { Input, ALL_FORMATS, UrlSource } from "mediabunny";
@@ -143,6 +144,24 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({ clips = [] }
                   }}
                 />
               </AbsoluteFill>
+            </Sequence>
+          );
+        })}
+
+      {activeClips
+        .filter((c) => c.type === "audio")
+        .map((clip) => {
+          return (
+            <Sequence
+              key={clip.id}
+              from={clip.timelineStartFrame}
+              durationInFrames={clip.durationInFrames}
+            >
+              <Audio
+                src={clip.src}
+                startFrom={clip.sourceStartFrame}
+                volume={clip.muted ? 0 : (clip.volume ?? 1)}
+              />
             </Sequence>
           );
         })}
