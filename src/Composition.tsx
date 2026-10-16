@@ -134,6 +134,7 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({ clips = [] }
                   src={clip.src}
                   startFrom={clip.sourceStartFrame}
                   volume={clip.muted ? 0 : (clip.volume ?? 1)}
+                  pauseWhenBuffering={false}
                   style={{
                     width: "100%",
                     height: "100%",

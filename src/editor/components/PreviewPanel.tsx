@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Player, PlayerRef } from "@remotion/player";
 import { VideoComposition } from "../../Composition";
 import { EditorState } from "../state/editorTypes";
+import { useCurrentPlayerFrame } from "../hooks/useCurrentPlayerFrame";
 
 type PreviewPanelProps = {
   state: EditorState;
@@ -26,26 +27,35 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
   playerRef,
 }) => {
   const [scaleMode, setScaleMode] = useState<"fit" | "50%" | "100%">("fit");
+  const [isPlaying, setIsPlaying] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Smooth playhead frame tracking without triggering parent re-renders
+  const currentFrame = useCurrentPlayerFrame(playerRef, state.currentFrame);
+
+  // Memoize inputProps so Player never re-evaluates unnecessarily on every frame
+  const inputProps = useMemo(() => ({ clips: state.clips }), [state.clips]);
 
   // Sync internal player events to editor state
   useEffect(() => {
     const current = playerRef.current;
     if (!current) return;
 
-    const handleFrameUpdate = (e: { detail: { frame: number } }) => {
-      onFrameChange(e.detail.frame);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      onPlayingChange(true);
     };
 
-    const handlePlay = () => onPlayingChange(true);
-    const handlePause = () => onPlayingChange(false);
+    const handlePause = () => {
+      setIsPlaying(false);
+      onPlayingChange(false);
+      onFrameChange(current.getCurrentFrame());
+    };
 
-    current.addEventListener("frameupdate", handleFrameUpdate);
     current.addEventListener("play", handlePlay);
     current.addEventListener("pause", handlePause);
 
     return () => {
-      current.removeEventListener("frameupdate", handleFrameUpdate);
       current.removeEventListener("play", handlePlay);
       current.removeEventListener("pause", handlePause);
     };
@@ -63,7 +73,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
 
   const stepFrame = (delta: number) => {
     if (playerRef.current) {
-      const nextFrame = Math.max(0, Math.min(state.currentFrame + delta, state.totalDurationInFrames));
+      const nextFrame = Math.max(0, Math.min(currentFrame + delta, state.totalDurationInFrames));
       playerRef.current.seekTo(nextFrame);
       onFrameChange(nextFrame);
     }
@@ -94,7 +104,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
           <Player
             ref={playerRef}
             component={VideoComposition}
-            inputProps={{ clips: state.clips }}
+            inputProps={inputProps}
             durationInFrames={Math.max(60, state.totalDurationInFrames)}
             compositionWidth={state.width}
             compositionHeight={state.height}
@@ -114,7 +124,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
         {/* Left: Timecode */}
         <div className="timecode-display">
           <span className="timecode-current">
-            {formatTimecode(state.currentFrame, state.fps)}
+            {formatTimecode(currentFrame, state.fps)}
           </span>
           <span style={{ margin: "0 4px", color: "var(--text-muted)" }}>/</span>
           <span>{formatTimecode(state.totalDurationInFrames, state.fps)}</span>
@@ -145,7 +155,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
             }}
             title="Play / Pause (Space)"
           >
-            {state.isPlaying ? (
+            {isPlaying ? (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="6" y="4" width="4" height="16" />
                 <rect x="14" y="4" width="4" height="16" />

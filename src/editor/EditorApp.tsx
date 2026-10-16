@@ -380,6 +380,7 @@ export const EditorApp: React.FC = () => {
       {/* Bottom Multitrack Timeline */}
       <Timeline
         state={state}
+        playerRef={playerRef}
         onSeek={handleSeek}
         onSelectClip={(id) => dispatch({ type: "SELECT_CLIP", id })}
         onMoveStart={handleMoveStart}

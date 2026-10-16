@@ -1,10 +1,13 @@
 import React, { useRef } from "react";
+import { PlayerRef } from "@remotion/player";
 import { EditorState } from "../state/editorTypes";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTrack } from "./TimelineTrack";
+import { useCurrentPlayerFrame } from "../hooks/useCurrentPlayerFrame";
 
 type TimelineProps = {
   state: EditorState;
+  playerRef: React.RefObject<PlayerRef | null>;
   onSeek: (frame: number) => void;
   onSelectClip: (id: string | null) => void;
   onMoveStart: () => void;
@@ -27,6 +30,7 @@ type TimelineProps = {
 
 export const Timeline: React.FC<TimelineProps> = ({
   state,
+  playerRef,
   onSeek,
   onSelectClip,
   onMoveStart,
@@ -48,8 +52,11 @@ export const Timeline: React.FC<TimelineProps> = ({
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Directly subscribe to player frame updates without top-level re-render overhead
+  const currentFrame = useCurrentPlayerFrame(playerRef, state.currentFrame);
+
   const totalWidthPx = Math.max(1400, state.totalDurationInFrames * state.zoom + 500);
-  const playheadLeftPx = state.currentFrame * state.zoom;
+  const playheadLeftPx = currentFrame * state.zoom;
 
   // Fit timeline to content calculation
   const handleFitToContent = () => {
@@ -63,7 +70,7 @@ export const Timeline: React.FC<TimelineProps> = ({
   const handlePlayheadPointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     const startX = e.clientX;
-    const initialFrame = state.currentFrame;
+    const initialFrame = currentFrame;
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const deltaX = moveEvent.clientX - startX;
