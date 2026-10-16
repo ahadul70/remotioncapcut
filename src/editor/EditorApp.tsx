@@ -3,7 +3,7 @@ import { PlayerRef } from "@remotion/player";
 import { staticFile } from "remotion";
 import { Input, ALL_FORMATS, UrlSource } from "mediabunny";
 
-import { Clip, EditorState, MediaAsset } from "./state/editorTypes";
+import { Clip, EditorState, HistorySnapshot, MediaAsset } from "./state/editorTypes";
 import { editorReducer } from "./state/editorReducer";
 import { HistoryManager } from "./state/history";
 
@@ -21,13 +21,13 @@ const INITIAL_STATE: EditorState = {
   fps: 30,
   width: 1080,
   height: 1920,
-  totalDurationInFrames: 300,
+  totalDurationInFrames: 2319, // 2289 frames (76.3s) + 30f padding
   currentFrame: 0,
   isPlaying: false,
   selectedClipId: "clip-test-1",
   activeTool: "select",
   snappingEnabled: true,
-  zoom: 3, // 3 px per frame
+  zoom: 0.8, // 0.8 px per frame gives ~1830px timeline, comfortable for desktop scrolling/fit
   tracks: [
     { id: "track-v1", type: "video", name: "V1 Video", visible: true, locked: false },
     { id: "track-a1", type: "audio", name: "A1 Audio", muted: false, locked: false },
@@ -41,8 +41,8 @@ const INITIAL_STATE: EditorState = {
       trackId: "track-v1",
       timelineStartFrame: 0,
       sourceStartFrame: 0,
-      durationInFrames: 300,
-      sourceDurationInFrames: 300,
+      durationInFrames: 2289,
+      sourceDurationInFrames: 2289,
       src: staticFile("TEST.mp4"),
       positionX: 0,
       positionY: 0,
@@ -59,8 +59,8 @@ const INITIAL_STATE: EditorState = {
       name: "TEST.mp4",
       type: "video",
       src: staticFile("TEST.mp4"),
-      durationInFrames: 300,
-      durationInSeconds: 10,
+      durationInFrames: 2289,
+      durationInSeconds: 76.29,
       fps: 30,
     },
   ],
@@ -73,18 +73,53 @@ export const EditorApp: React.FC = () => {
   const [state, dispatch] = useReducer(editorReducer, INITIAL_STATE);
   const playerRef = useRef<PlayerRef | null>(null);
   const historyRef = useRef<HistoryManager>(new HistoryManager());
+  const pendingSnapshotRef = useRef<HistorySnapshot | null>(null);
 
-  // Capture snapshot for undo stack
+  // Helper to capture a deep snapshot of current state
+  const captureSnapshot = useCallback((): HistorySnapshot => ({
+    clips: JSON.parse(JSON.stringify(state.clips)),
+    tracks: JSON.parse(JSON.stringify(state.tracks)),
+    selectedClipId: state.selectedClipId,
+    totalDurationInFrames: state.totalDurationInFrames,
+  }), [state.clips, state.tracks, state.selectedClipId, state.totalDurationInFrames]);
+
+  // Capture snapshot for undo stack (discrete actions)
   const recordSnapshot = useCallback(() => {
-    historyRef.current.push({
-      clips: state.clips,
-      tracks: state.tracks,
-      selectedClipId: state.selectedClipId,
-      totalDurationInFrames: state.totalDurationInFrames,
-    });
-  }, [state.clips, state.tracks, state.selectedClipId, state.totalDurationInFrames]);
+    historyRef.current.push(captureSnapshot());
+  }, [captureSnapshot]);
 
-  // Compute actual duration of TEST.mp4 on mount using mediabunny
+  // Pre-action handlers for drag interactions: capture state before modification occurs
+  const handleMoveStart = useCallback(() => {
+    pendingSnapshotRef.current = captureSnapshot();
+  }, [captureSnapshot]);
+
+  const handleCommitMove = useCallback(() => {
+    if (pendingSnapshotRef.current) {
+      historyRef.current.push(pendingSnapshotRef.current);
+      pendingSnapshotRef.current = null;
+    }
+  }, []);
+
+  const handleCancelMove = useCallback(() => {
+    pendingSnapshotRef.current = null;
+  }, []);
+
+  const handleTrimBegin = useCallback(() => {
+    pendingSnapshotRef.current = captureSnapshot();
+  }, [captureSnapshot]);
+
+  const handleCommitTrim = useCallback(() => {
+    if (pendingSnapshotRef.current) {
+      historyRef.current.push(pendingSnapshotRef.current);
+      pendingSnapshotRef.current = null;
+    }
+  }, []);
+
+  const handleCancelTrim = useCallback(() => {
+    pendingSnapshotRef.current = null;
+  }, []);
+
+  // Compute actual duration of TEST.mp4 on mount using mediabunny (if dynamic update needed)
   useEffect(() => {
     const input = new Input({
       formats: ALL_FORMATS,
@@ -96,7 +131,7 @@ export const EditorApp: React.FC = () => {
       .then((durationSec) => {
         const frames = Math.max(Math.ceil(durationSec * 30), 60);
 
-        // Update asset and initial clip with real duration
+        // Update asset and initial clip if different
         dispatch({
           type: "UPDATE_CLIP_PROPERTIES",
           clipId: "clip-test-1",
@@ -122,12 +157,16 @@ export const EditorApp: React.FC = () => {
   // Synchronize external playhead seeks to Remotion Player
   const handleSeek = useCallback(
     (frame: number) => {
-      dispatch({ type: "SET_PLAYHEAD", frame });
+      if (playerRef.current?.isPlaying()) {
+        playerRef.current.pause();
+      }
+      const clamped = Math.max(0, Math.min(state.totalDurationInFrames, frame));
+      dispatch({ type: "SET_PLAYHEAD", frame: clamped });
       if (playerRef.current) {
-        playerRef.current.seekTo(frame);
+        playerRef.current.seekTo(clamped);
       }
     },
-    [playerRef]
+    [playerRef, state.totalDurationInFrames]
   );
 
   // Undo / Redo handlers
@@ -167,16 +206,6 @@ export const EditorApp: React.FC = () => {
     recordSnapshot();
     dispatch({ type: "DELETE_CLIP" });
   }, [recordSnapshot, state.selectedClipId]);
-
-  // Move clip commit with history
-  const handleCommitMove = useCallback(() => {
-    recordSnapshot();
-  }, [recordSnapshot]);
-
-  // Trim clip commit with history
-  const handleCommitTrim = useCallback(() => {
-    recordSnapshot();
-  }, [recordSnapshot]);
 
   // Property update with history
   const handleUpdateProperties = useCallback(
@@ -235,8 +264,13 @@ export const EditorApp: React.FC = () => {
   // Keyboard shortcuts listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = (document.activeElement?.tagName || "").toLowerCase();
-      if (activeTag === "input" || activeTag === "textarea") {
+      const activeEl = document.activeElement;
+      const isInputFocused =
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          (activeEl as HTMLElement).isContentEditable);
+      if (isInputFocused) {
         return;
       }
 
@@ -348,10 +382,13 @@ export const EditorApp: React.FC = () => {
         state={state}
         onSeek={handleSeek}
         onSelectClip={(id) => dispatch({ type: "SELECT_CLIP", id })}
+        onMoveStart={handleMoveStart}
         onMoveClip={(clipId, newStartFrame) =>
           dispatch({ type: "MOVE_CLIP", clipId, newStartFrame })
         }
         onCommitMove={handleCommitMove}
+        onCancelMove={handleCancelMove}
+        onTrimBegin={handleTrimBegin}
         onTrimStart={(clipId, newStartFrame) =>
           dispatch({ type: "TRIM_CLIP_START", clipId, newStartFrame })
         }
@@ -359,6 +396,7 @@ export const EditorApp: React.FC = () => {
           dispatch({ type: "TRIM_CLIP_END", clipId, newDurationInFrames })
         }
         onCommitTrim={handleCommitTrim}
+        onCancelTrim={handleCancelTrim}
         onSplit={handleSplit}
         onDelete={handleDelete}
         onToggleSnapping={() => dispatch({ type: "TOGGLE_SNAPPING" })}

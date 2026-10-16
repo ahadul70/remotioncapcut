@@ -7,11 +7,15 @@ type TimelineProps = {
   state: EditorState;
   onSeek: (frame: number) => void;
   onSelectClip: (id: string | null) => void;
+  onMoveStart: () => void;
   onMoveClip: (id: string, newStartFrame: number) => void;
   onCommitMove: () => void;
+  onCancelMove: () => void;
+  onTrimBegin: () => void;
   onTrimStart: (id: string, newStartFrame: number) => void;
   onTrimEnd: (id: string, newDurationInFrames: number) => void;
   onCommitTrim: () => void;
+  onCancelTrim: () => void;
   onSplit: () => void;
   onDelete: () => void;
   onToggleSnapping: () => void;
@@ -25,11 +29,15 @@ export const Timeline: React.FC<TimelineProps> = ({
   state,
   onSeek,
   onSelectClip,
+  onMoveStart,
   onMoveClip,
   onCommitMove,
+  onCancelMove,
+  onTrimBegin,
   onTrimStart,
   onTrimEnd,
   onCommitTrim,
+  onCancelTrim,
   onSplit,
   onDelete,
   onToggleSnapping,
@@ -46,8 +54,8 @@ export const Timeline: React.FC<TimelineProps> = ({
   // Fit timeline to content calculation
   const handleFitToContent = () => {
     if (!scrollContainerRef.current) return;
-    const containerWidth = scrollContainerRef.current.clientWidth - 100;
-    const computedZoom = Math.max(1, Math.min(15, containerWidth / state.totalDurationInFrames));
+    const containerWidth = scrollContainerRef.current.clientWidth - 80;
+    const computedZoom = Math.max(0.2, Math.min(10, +(containerWidth / state.totalDurationInFrames).toFixed(2)));
     onZoomChange(computedZoom);
   };
 
@@ -127,7 +135,7 @@ export const Timeline: React.FC<TimelineProps> = ({
         <div className="toolbar-zoom">
           <button
             className="btn btn-icon"
-            onClick={() => onZoomChange(Math.max(1, state.zoom - 1))}
+            onClick={() => onZoomChange(Math.max(0.2, +(state.zoom - (state.zoom > 1 ? 0.5 : 0.1)).toFixed(2)))}
             title="Zoom Out (-)"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -137,18 +145,18 @@ export const Timeline: React.FC<TimelineProps> = ({
 
           <input
             type="range"
-            min="1"
-            max="15"
-            step="0.5"
+            min="0.2"
+            max="10"
+            step="0.1"
             style={{ width: "80px", accentColor: "var(--accent)" }}
             value={state.zoom}
             onChange={(e) => onZoomChange(parseFloat(e.target.value))}
-            title={`Timeline Zoom: ${state.zoom} px/frame`}
+            title={`Timeline Zoom: ${state.zoom.toFixed(1)} px/frame`}
           />
 
           <button
             className="btn btn-icon"
-            onClick={() => onZoomChange(Math.min(15, state.zoom + 1))}
+            onClick={() => onZoomChange(Math.min(10, +(state.zoom + (state.zoom >= 1 ? 0.5 : 0.1)).toFixed(2)))}
             title="Zoom In (+)"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -254,11 +262,15 @@ export const Timeline: React.FC<TimelineProps> = ({
               zoom={state.zoom}
               selectedClipId={state.selectedClipId}
               onSelectClip={onSelectClip}
+              onMoveStart={onMoveStart}
               onMoveClip={onMoveClip}
               onCommitMove={onCommitMove}
+              onCancelMove={onCancelMove}
+              onTrimBegin={onTrimBegin}
               onTrimStart={onTrimStart}
               onTrimEnd={onTrimEnd}
               onCommitTrim={onCommitTrim}
+              onCancelTrim={onCancelTrim}
               totalWidthPx={totalWidthPx}
             />
           ))}

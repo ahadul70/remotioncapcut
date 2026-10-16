@@ -20,7 +20,8 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
   // Dynamic interval calculation
   const pxPerSecond = fps * zoom;
   let secondInterval = 1;
-  if (pxPerSecond < 20) secondInterval = 10;
+  if (pxPerSecond < 8) secondInterval = 30;
+  else if (pxPerSecond < 18) secondInterval = 10;
   else if (pxPerSecond < 45) secondInterval = 5;
   else if (pxPerSecond < 90) secondInterval = 2;
   else secondInterval = 1;
@@ -62,7 +63,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
 
     const seekAtPosition = (clientX: number) => {
       const offsetX = clientX - rect.left;
-      const targetFrame = Math.max(0, Math.round(offsetX / zoom));
+      const targetFrame = Math.max(0, Math.min(totalDurationInFrames, Math.round(offsetX / zoom)));
       onSeek(targetFrame);
     };
 

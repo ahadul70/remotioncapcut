@@ -6,11 +6,15 @@ type TimelineClipProps = {
   zoom: number;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  onMoveStart: () => void;
   onMove: (id: string, newStartFrame: number) => void;
   onCommitMove: () => void;
+  onCancelMove: () => void;
+  onTrimBegin: () => void;
   onTrimStart: (id: string, newStartFrame: number) => void;
   onTrimEnd: (id: string, newDurationInFrames: number) => void;
   onCommitTrim: () => void;
+  onCancelTrim: () => void;
 };
 
 export const TimelineClip: React.FC<TimelineClipProps> = ({
@@ -18,11 +22,15 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
   zoom,
   isSelected,
   onSelect,
+  onMoveStart,
   onMove,
   onCommitMove,
+  onCancelMove,
+  onTrimBegin,
   onTrimStart,
   onTrimEnd,
   onCommitTrim,
+  onCancelTrim,
 }) => {
   const clipRef = useRef<HTMLDivElement>(null);
 
@@ -41,6 +49,9 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
     const initialStart = clip.timelineStartFrame;
     let hasMoved = false;
 
+    // Capture pre-move snapshot in history
+    onMoveStart();
+
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const deltaX = moveEvent.clientX - startX;
       const deltaFrames = Math.round(deltaX / zoom);
@@ -55,6 +66,8 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
       window.removeEventListener("pointerup", handlePointerUp);
       if (hasMoved) {
         onCommitMove();
+      } else {
+        onCancelMove();
       }
     };
 
@@ -71,6 +84,8 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
     const initialStart = clip.timelineStartFrame;
     let hasMoved = false;
 
+    onTrimBegin();
+
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const deltaX = moveEvent.clientX - startX;
       const deltaFrames = Math.round(deltaX / zoom);
@@ -85,6 +100,8 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
       window.removeEventListener("pointerup", handlePointerUp);
       if (hasMoved) {
         onCommitTrim();
+      } else {
+        onCancelTrim();
       }
     };
 
@@ -101,6 +118,8 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
     const initialDuration = clip.durationInFrames;
     let hasMoved = false;
 
+    onTrimBegin();
+
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const deltaX = moveEvent.clientX - startX;
       const deltaFrames = Math.round(deltaX / zoom);
@@ -115,6 +134,8 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
       window.removeEventListener("pointerup", handlePointerUp);
       if (hasMoved) {
         onCommitTrim();
+      } else {
+        onCancelTrim();
       }
     };
 

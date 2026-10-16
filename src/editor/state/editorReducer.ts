@@ -29,10 +29,12 @@ export type Action =
   | { type: "RENAME_PROJECT"; name: string }
   | { type: "ADD_ASSET"; asset: MediaAsset };
 
-function recalculateDuration(clips: Clip[], defaultDuration: number): number {
+const DEFAULT_MIN_DURATION = 2319; // ~77s default timeline base (covers 2289f TEST.mp4 + 30f padding)
+
+function recalculateDuration(clips: Clip[], defaultDuration: number = DEFAULT_MIN_DURATION): number {
   if (clips.length === 0) return defaultDuration;
   const maxEnd = Math.max(...clips.map((c) => c.timelineStartFrame + c.durationInFrames));
-  return Math.max(defaultDuration, maxEnd + 30); // 1 sec padding at end
+  return Math.max(DEFAULT_MIN_DURATION, maxEnd + 30); // 1 sec padding at end
 }
 
 export function editorReducer(state: EditorState, action: Action): EditorState {
@@ -59,7 +61,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     }
 
     case "SET_ZOOM": {
-      const zoom = Math.max(1, Math.min(action.zoom, 25));
+      const zoom = Math.max(0.2, Math.min(action.zoom, 15));
       return { ...state, zoom };
     }
 
@@ -74,7 +76,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       let newStart = Math.max(0, action.newStartFrame);
 
       if (state.snappingEnabled) {
-        const snapThreshold = 6; // frames
+        // Dynamic snap threshold in frames (~10px on screen, minimum 3 frames)
+        const snapThreshold = Math.max(3, Math.round(10 / state.zoom));
         const snapPoints = [0, state.currentFrame];
 
         // Collect other clips' boundaries
@@ -168,22 +171,38 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     }
 
     case "SPLIT_CLIP_AT_PLAYHEAD": {
-      if (!state.selectedClipId) return state;
-      const clip = state.clips.find((c) => c.id === state.selectedClipId);
-      if (!clip) return state;
-
-      // Playhead must fall strictly within the clip
       const playhead = state.currentFrame;
-      if (playhead <= clip.timelineStartFrame || playhead >= clip.timelineStartFrame + clip.durationInFrames) {
-        return state;
+
+      // Find target clip: either currently selected clip, or clip located under the playhead
+      let clip = state.selectedClipId
+        ? state.clips.find((c) => c.id === state.selectedClipId)
+        : null;
+
+      // If selected clip doesn't contain playhead, try finding any clip containing playhead
+      if (!clip || playhead <= clip.timelineStartFrame || playhead >= clip.timelineStartFrame + clip.durationInFrames) {
+        clip =
+          state.clips.find(
+            (c) => playhead > c.timelineStartFrame && playhead < c.timelineStartFrame + c.durationInFrames
+          ) || null;
       }
+
+      if (!clip) return state;
 
       const offset = playhead - clip.timelineStartFrame;
       const firstDuration = offset;
       const secondDuration = clip.durationInFrames - offset;
 
+      // Must have at least 1 frame per part
+      if (firstDuration < 1 || secondDuration < 1) return state;
+
+      const baseName = clip.name.replace(/ \(Part \d+\)$/, "");
+      const existingPartMatch = clip.name.match(/\(Part (\d+)\)$/);
+      const firstPartNum = existingPartMatch ? parseInt(existingPartMatch[1], 10) : 1;
+      const secondPartNum = firstPartNum + 1;
+
       const firstClip: Clip = {
         ...clip,
+        name: existingPartMatch ? clip.name : `${baseName} (Part 1)`,
         durationInFrames: firstDuration,
       };
 
@@ -191,7 +210,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const secondClip: Clip = {
         ...clip,
         id: secondClipId,
-        name: `${clip.name.replace(/ \(Part \d+\)$/, "")} (Part 2)`,
+        name: `${baseName} (Part ${secondPartNum})`,
         timelineStartFrame: playhead,
         durationInFrames: secondDuration,
         sourceStartFrame: clip.sourceStartFrame + firstDuration,
