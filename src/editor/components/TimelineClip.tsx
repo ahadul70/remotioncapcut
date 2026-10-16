@@ -1,5 +1,7 @@
 import React, { useRef } from "react";
 import { Clip } from "../state/editorTypes";
+import { ClipFilmstrip } from "./ClipFilmstrip";
+import { ClipWaveform } from "./ClipWaveform";
 
 type TimelineClipProps = {
   clip: Clip;
@@ -193,7 +195,15 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
         />
       )}
 
-      {/* Clip Content */}
+      {/* Visual media underlay: Filmstrip for video clips, Waveform for audio clips */}
+      {clip.type === "video" && (
+        <ClipFilmstrip clip={clip} zoom={zoom} />
+      )}
+      {clip.type === "audio" && (
+        <ClipWaveform clip={clip} widthPx={widthPx} />
+      )}
+
+      {/* Clip Content Overlay (Label, Lock badge, Duration) */}
       <div className="clip-content">
         {isLocked && (
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: "5px", flexShrink: 0, opacity: 0.85 }}>

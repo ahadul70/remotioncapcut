@@ -1,5 +1,6 @@
 import { random } from "remotion";
 import { Clip, MediaAsset } from "../state/editorTypes";
+import { thumbnailCache } from "./thumbnailCache";
 
 export type MediaValidationResult = {
   valid: boolean;
@@ -228,6 +229,9 @@ export async function extractMediaMetadata(file: File, fps: number): Promise<Ext
       if (isVideo) {
         try {
           thumbnail = await captureVideoThumbnail(objectUrl);
+          if (thumbnail) {
+            thumbnailCache.setCached(objectUrl, 0, thumbnail);
+          }
         } catch {
           thumbnail = undefined;
         }

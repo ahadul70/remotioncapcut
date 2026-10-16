@@ -1,0 +1,57 @@
+# Step 5: Real Video Thumbnails and Audio Waveforms
+
+Work on the existing project at `E:\remotion`. Inspect the actual project and current Git state before making changes.
+
+## Objective
+Add real filmstrip thumbnails to video clips and real waveform visualization to audio clips in the existing multitrack timeline.
+
+## 1. Preserve existing functionality
+- Inspect the clip, track, and media asset models, timeline components, media import utilities, and current tests.
+- Preserve Steps 2, 3, and 4, including editing operations, media import, track controls, preview, and rendering.
+- Reuse existing dependencies where practical. Do not introduce a backend or unrelated libraries.
+- Keep editor UI outside the Remotion composition.
+
+## 2. Video thumbnails
+- Generate thumbnails from actual imported video frames.
+- Display multiple evenly spaced thumbnails across longer timeline clips, with sensible behavior for short clips.
+- Account for source in/out points and clip trimming so thumbnails correspond to the correct source frames.
+- Support the existing sample video and imported local media.
+- Handle unavailable frames, loading failures, and unsupported formats gracefully.
+- Reuse cached thumbnails rather than repeatedly extracting the same frames.
+- Keep thumbnails clipped to their clip boundaries and aligned during dragging, trimming, zooming, and horizontal scrolling.
+
+## 3. Audio waveforms
+- Generate waveform data from actual audio samples, not random or decorative values.
+- Support audio-only assets and audio tracks from video where practical.
+- Display a readable waveform inside audio clips.
+- Cache waveform data and avoid processing the entire media file repeatedly.
+- Handle large files and decoding failures without freezing the editor.
+- Ensure waveform rendering stays aligned when clips move, trim, or change zoom.
+- If full waveform generation is expensive, use asynchronous processing or progressive generation.
+
+## 4. Performance and lifecycle
+- Avoid expensive media decoding during every React render.
+- Revoke temporary object URLs when no longer needed, without invalidating media still in use.
+- Prevent stale asynchronous thumbnail or waveform results from updating the wrong clip.
+- Use appropriate caching and cleanup.
+- Preserve smooth timeline scrolling and drag interactions.
+
+## 5. Testing
+Add tests for:
+- Thumbnail source-time calculations after trimming.
+- Waveform time/frame alignment.
+- Cache reuse.
+- Loading and decoding failures.
+- Correct alignment during timeline zoom and clip movement.
+- Ensuring existing editing operations remain functional.
+
+Run the available lint, type-check, automated tests, Vite build, and Remotion build commands based on the actual package scripts.
+
+## Scope exclusions
+Do not implement AI editing, transitions, captions, project persistence, or a UI redesign in this milestone.
+
+## Final report
+List files changed, actual implementation details, commands and results, browser tests performed, rendering tests performed, and remaining limitations. Do not claim browser verification unless it was performed.
+
+## Acceptance criteria
+Video clips display genuine source-frame thumbnails. Audio clips display genuine waveform data. Both remain aligned through trimming, movement, zoom, and scrolling, without breaking existing editing or causing major performance problems.
