@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { PlayerRef } from "@remotion/player";
 import { EditorState, MediaAsset } from "../state/editorTypes";
 import { TimelineRuler } from "./TimelineRuler";
@@ -66,11 +66,29 @@ export const Timeline: React.FC<TimelineProps> = ({
   const totalWidthPx = Math.max(1400, state.totalDurationInFrames * state.zoom + 500);
   const playheadLeftPx = currentFrame * state.zoom;
 
+  // Non-passive wheel handler for Ctrl/Alt/Cmd + Mouse Wheel zoom
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.25 : 0.8;
+        const nextZoom = Math.max(0.1, Math.min(40, +(state.zoom * factor).toFixed(2)));
+        onZoomChange(nextZoom);
+      }
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, [state.zoom, onZoomChange]);
+
   // Fit timeline to content calculation
   const handleFitToContent = () => {
     if (!scrollContainerRef.current) return;
     const containerWidth = scrollContainerRef.current.clientWidth - 80;
-    const computedZoom = Math.max(0.2, Math.min(10, +(containerWidth / state.totalDurationInFrames).toFixed(2)));
+    const computedZoom = Math.max(0.1, Math.min(40, +(containerWidth / state.totalDurationInFrames).toFixed(2)));
     onZoomChange(computedZoom);
   };
 
@@ -193,8 +211,8 @@ export const Timeline: React.FC<TimelineProps> = ({
         <div className="toolbar-zoom">
           <button
             className="btn btn-icon"
-            onClick={() => onZoomChange(Math.max(0.2, +(state.zoom - (state.zoom > 1 ? 0.5 : 0.1)).toFixed(2)))}
-            title="Zoom Out (-)"
+            onClick={() => onZoomChange(Math.max(0.1, +(state.zoom / 1.4).toFixed(2)))}
+            title="Zoom Out (Ctrl+Minus or Ctrl+Scroll Down)"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="5" y1="12" x2="19" y2="12" />
@@ -203,25 +221,39 @@ export const Timeline: React.FC<TimelineProps> = ({
 
           <input
             type="range"
-            min="0.2"
-            max="10"
+            min="0.1"
+            max="40"
             step="0.1"
-            style={{ width: "80px", accentColor: "var(--accent)" }}
+            style={{ width: "90px", accentColor: "var(--accent)" }}
             value={state.zoom}
             onChange={(e) => onZoomChange(parseFloat(e.target.value))}
-            title={`Timeline Zoom: ${state.zoom.toFixed(1)} px/frame`}
+            title={`Timeline Zoom: ${state.zoom >= 3.5 ? `${Math.round(state.zoom)} px/f (Frame Level)` : `${state.zoom.toFixed(1)}x`}`}
           />
 
           <button
             className="btn btn-icon"
-            onClick={() => onZoomChange(Math.min(10, +(state.zoom + (state.zoom >= 1 ? 0.5 : 0.1)).toFixed(2)))}
-            title="Zoom In (+)"
+            onClick={() => onZoomChange(Math.min(40, +(state.zoom * 1.4).toFixed(2)))}
+            title="Zoom In (Ctrl+Plus or Ctrl+Scroll Up)"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </button>
+
+          <span
+            style={{
+              fontSize: "11px",
+              fontFamily: "var(--font-mono)",
+              color: state.zoom >= 3.5 ? "var(--accent)" : "var(--text-secondary)",
+              minWidth: "46px",
+              textAlign: "center",
+              fontWeight: state.zoom >= 3.5 ? 600 : 400,
+            }}
+            title={state.zoom >= 3.5 ? "Frame-level view active (1 tick per frame)" : "Timeline zoom level"}
+          >
+            {state.zoom >= 3.5 ? `${Math.round(state.zoom)}px/f` : `${state.zoom.toFixed(1)}x`}
+          </span>
 
           <button
             className="btn"
@@ -320,6 +352,7 @@ export const Timeline: React.FC<TimelineProps> = ({
             zoom={state.zoom}
             fps={state.fps}
             onSeek={onSeek}
+            scrollContainerRef={scrollContainerRef}
           />
 
           {/* Track Lanes */}

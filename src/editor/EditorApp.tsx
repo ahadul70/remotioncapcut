@@ -503,11 +503,23 @@ export const EditorApp: React.FC = () => {
         e.preventDefault();
         handleRedo();
       }
+
+      // Ctrl+= / Ctrl++: Zoom In
+      if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+" || e.code === "NumpadAdd")) {
+        e.preventDefault();
+        dispatch({ type: "SET_ZOOM", zoom: Math.min(40, +(state.zoom * 1.3).toFixed(2)) });
+      }
+
+      // Ctrl+-: Zoom Out
+      if ((e.ctrlKey || e.metaKey) && (e.key === "-" || e.code === "NumpadSubtract")) {
+        e.preventDefault();
+        dispatch({ type: "SET_ZOOM", zoom: Math.max(0.1, +(state.zoom / 1.3).toFixed(2)) });
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleDelete, handleSplit, handleSeek, handleUndo, handleRedo, state.currentFrame, state.totalDurationInFrames]);
+  }, [handleDelete, handleSplit, handleSeek, handleUndo, handleRedo, state.currentFrame, state.totalDurationInFrames, state.zoom]);
 
   const selectedClip = state.clips.find((c) => c.id === state.selectedClipId) || null;
 

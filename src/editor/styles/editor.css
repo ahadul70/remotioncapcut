@@ -495,13 +495,18 @@ body, html, #root {
   border-bottom: 1px solid var(--border-color);
   position: relative;
   cursor: pointer;
+  user-select: none;
+}
+
+.time-ruler.frame-level {
+  background-color: #16171b;
 }
 
 .ruler-tick {
   position: absolute;
   top: 0;
   height: 100%;
-  border-left: 1px solid #363840;
+  border-left: 1px solid #4a4d58;
   display: flex;
   align-items: flex-end;
   padding-bottom: 3px;
@@ -509,12 +514,30 @@ body, html, #root {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text-muted);
+  pointer-events: none;
+  white-space: nowrap;
 }
+
+.time-ruler.frame-level .ruler-tick {
+  border-left: 1px solid var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .ruler-subtick {
   position: absolute;
   top: 14px;
   height: 14px;
-  border-left: 1px solid #282a30;
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+}
+
+.ruler-frame-tick {
+  position: absolute;
+  top: 19px;
+  height: 9px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  pointer-events: none;
 }
 
 /* Playhead line */

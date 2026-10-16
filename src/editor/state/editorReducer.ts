@@ -65,7 +65,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     }
 
     case "SET_ZOOM": {
-      const zoom = Math.max(0.2, Math.min(action.zoom, 15));
+      const zoom = Math.max(0.1, Math.min(action.zoom, 40));
       return { ...state, zoom };
     }
 
