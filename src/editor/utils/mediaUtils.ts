@@ -121,8 +121,7 @@ export function captureVideoThumbnail(videoSrc: string): Promise<string | undefi
     }
 
     const video = document.createElement("video");
-    video.preload = "metadata";
-    video.src = videoSrc;
+    video.preload = "auto";
     video.muted = true;
     video.playsInline = true;
 
@@ -162,7 +161,6 @@ export function captureVideoThumbnail(videoSrc: string): Promise<string | undefi
 
     const onLoadedData = () => {
       try {
-        // Seek to 0.1s to get a representative non-black frame if possible
         if (video.duration > 0.2) {
           video.currentTime = 0.1;
         } else {
@@ -182,13 +180,20 @@ export function captureVideoThumbnail(videoSrc: string): Promise<string | undefi
     video.addEventListener("seeked", onSeeked);
     video.addEventListener("error", onError);
 
-    // Safeguard timeout: 1.5s max for thumbnail generation
+    video.src = videoSrc;
+    try {
+      video.load();
+    } catch {
+      // Ignore
+    }
+
+    // Short timeout safeguard (800ms)
     setTimeout(() => {
       if (!resolved) {
         cleanup();
         resolve(undefined);
       }
-    }, 1500);
+    }, 800);
   });
 }
 
@@ -204,11 +209,11 @@ export async function extractMediaMetadata(file: File, fps: number): Promise<Ext
   const mediaType = validation.mediaType;
   const objectUrl = URL.createObjectURL(file);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const isVideo = mediaType === "video";
     const mediaEl = isVideo ? document.createElement("video") : document.createElement("audio");
-    mediaEl.preload = "metadata";
-    mediaEl.src = objectUrl;
+    mediaEl.preload = "auto";
+    mediaEl.muted = true;
 
     let settled = false;
 
@@ -216,12 +221,16 @@ export async function extractMediaMetadata(file: File, fps: number): Promise<Ext
       if (settled) return;
       settled = true;
 
-      const durationInSeconds = Math.max(0.1, durationSec);
+      const durationInSeconds = Math.max(0.1, isFinite(durationSec) && durationSec > 0 ? durationSec : 10);
       const durationInFrames = calculateFramesFromDuration(durationInSeconds, fps);
 
       let thumbnail: string | undefined;
       if (isVideo) {
-        thumbnail = await captureVideoThumbnail(objectUrl);
+        try {
+          thumbnail = await captureVideoThumbnail(objectUrl);
+        } catch {
+          thumbnail = undefined;
+        }
       }
 
       resolve({
@@ -234,46 +243,47 @@ export async function extractMediaMetadata(file: File, fps: number): Promise<Ext
       });
     };
 
+    const tryMediabunnyFallback = async () => {
+      try {
+        const { Input, ALL_FORMATS, BlobSource } = await import("mediabunny");
+        const input = new Input({
+          formats: ALL_FORMATS,
+          source: new BlobSource(file),
+        });
+        const computedSec = await input.computeDuration();
+        input.dispose();
+        finalize(computedSec);
+      } catch {
+        finalize(10); // Safe fallback: default 10 seconds duration
+      }
+    };
+
     mediaEl.onloadedmetadata = () => {
       const durationSec = mediaEl.duration;
       if (isFinite(durationSec) && durationSec > 0) {
         const videoEl = isVideo ? (mediaEl as HTMLVideoElement) : null;
         finalize(durationSec, videoEl?.videoWidth, videoEl?.videoHeight);
       } else {
-        // If duration is Infinity or NaN (some webm streams), try Mediabunny or fallback
-        import("mediabunny")
-          .then(async ({ Input, ALL_FORMATS, BlobSource }) => {
-            try {
-              const input = new Input({
-                formats: ALL_FORMATS,
-                source: new BlobSource(file),
-              });
-              const computedSec = await input.computeDuration();
-              input.dispose();
-              finalize(computedSec);
-            } catch {
-              finalize(10); // Safe fallback
-            }
-          })
-          .catch(() => {
-            finalize(10);
-          });
+        tryMediabunnyFallback();
       }
     };
 
     mediaEl.onerror = () => {
-      if (settled) return;
-      settled = true;
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error(`Could not decode media metadata for "${file.name}". The file may be corrupt or unreadable.`));
+      tryMediabunnyFallback();
     };
 
-    // 5-second timeout safeguard for metadata parsing
+    mediaEl.src = objectUrl;
+    try {
+      mediaEl.load();
+    } catch {
+      tryMediabunnyFallback();
+    }
+
+    // 2-second timeout safeguard for metadata parsing
     setTimeout(() => {
       if (!settled) {
-        settled = true;
-        finalize(10);
+        tryMediabunnyFallback();
       }
-    }, 5000);
+    }, 2000);
   });
 }

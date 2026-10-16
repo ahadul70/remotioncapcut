@@ -96,11 +96,21 @@ export const TimelineTrack: React.FC<TimelineTrackProps> = ({
 
     // Media asset dragged from MediaPanel
     try {
-      const dataStr = e.dataTransfer.getData("application/json");
+      const dataStr = e.dataTransfer.getData("application/json") || e.dataTransfer.getData("text/plain");
       if (dataStr) {
-        const parsed = JSON.parse(dataStr);
-        if (parsed.type === "media-asset" && parsed.assetId) {
-          const asset = allAssets.find((a) => a.id === parsed.assetId);
+        let assetId: string | undefined;
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed && parsed.assetId) {
+            assetId = parsed.assetId;
+          }
+        } catch {
+          // Plain assetId string fallback
+          assetId = dataStr.trim();
+        }
+
+        if (assetId) {
+          const asset = allAssets.find((a) => a.id === assetId);
           if (asset && onDropAsset) {
             onDropAsset(track.id, targetFrame, asset);
           }

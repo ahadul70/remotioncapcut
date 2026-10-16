@@ -270,17 +270,38 @@ export const EditorApp: React.FC = () => {
       recordSnapshot();
 
       // Find compatible track
-      const targetTrack =
+      let targetTrack =
         (targetTrackId && state.tracks.find((t) => t.id === targetTrackId)) ||
         state.tracks.find((t) => (asset.type === "audio" ? t.type === "audio" : t.type === "video")) ||
         state.tracks[0];
 
-      const startFrame =
-        targetStartFrame !== undefined
-          ? targetStartFrame
-          : playerRef.current
-          ? playerRef.current.getCurrentFrame()
-          : state.currentFrame;
+      let startFrame: number;
+      if (targetStartFrame !== undefined) {
+        startFrame = targetStartFrame;
+      } else {
+        const playhead = playerRef.current ? playerRef.current.getCurrentFrame() : state.currentFrame;
+        const existingClipsOnTrack = state.clips.filter((c) => c.trackId === targetTrack.id);
+        const overlapsAtPlayhead = existingClipsOnTrack.some(
+          (c) => playhead >= c.timelineStartFrame && playhead < c.timelineStartFrame + c.durationInFrames
+        );
+
+        if (overlapsAtPlayhead) {
+          // If another unlocked track of same type exists, use it so it overlays on top
+          const otherCompatibleTrack = state.tracks.find(
+            (t) => t.type === targetTrack.type && t.id !== targetTrack.id && !t.locked
+          );
+          if (otherCompatibleTrack) {
+            targetTrack = otherCompatibleTrack;
+            startFrame = playhead;
+          } else {
+            // Append after existing clips on track
+            const maxEnd = Math.max(0, ...existingClipsOnTrack.map((c) => c.timelineStartFrame + c.durationInFrames));
+            startFrame = maxEnd;
+          }
+        } else {
+          startFrame = playhead;
+        }
+      }
 
       const newClip = createClipFromAsset(asset, targetTrack.id, startFrame);
 
@@ -296,14 +317,23 @@ export const EditorApp: React.FC = () => {
           ),
         },
       });
+
+      // Jump playhead to the new clip start so user immediately sees preview
+      handleSeek(startFrame);
     },
-    [recordSnapshot, state.tracks, playerRef, state.currentFrame, state.clips, state.totalDurationInFrames]
+    [recordSnapshot, state.tracks, playerRef, state.currentFrame, state.clips, state.totalDurationInFrames, handleSeek]
   );
 
-  // Bulk import assets into state
-  const handleImportAssets = useCallback((newAssets: MediaAsset[]) => {
-    dispatch({ type: "ADD_ASSETS", assets: newAssets });
-  }, []);
+  // Bulk import assets into state and auto-place on timeline
+  const handleImportAssets = useCallback(
+    (newAssets: MediaAsset[]) => {
+      dispatch({ type: "ADD_ASSETS", assets: newAssets });
+      if (newAssets.length > 0) {
+        handleAddAssetToTimeline(newAssets[0]);
+      }
+    },
+    [handleAddAssetToTimeline]
+  );
 
   // Dropping an asset onto a timeline track
   const handleDropAsset = useCallback(
@@ -319,6 +349,7 @@ export const EditorApp: React.FC = () => {
       const files = Array.from(fileList);
       let currentDropFrame = frame;
       const importedAssets: MediaAsset[] = [];
+      const newClips: Clip[] = [];
 
       for (const file of files) {
         try {
@@ -339,7 +370,15 @@ export const EditorApp: React.FC = () => {
             thumbnail: metadata.thumbnail,
           };
           importedAssets.push(asset);
-          handleAddAssetToTimeline(asset, trackId, currentDropFrame);
+
+          // Route to compatible track
+          const targetTrack =
+            state.tracks.find((t) => t.id === trackId && t.type === asset.type) ||
+            state.tracks.find((t) => t.type === asset.type && !t.locked) ||
+            state.tracks[0];
+
+          const clip = createClipFromAsset(asset, targetTrack.id, currentDropFrame);
+          newClips.push(clip);
           currentDropFrame += asset.durationInFrames;
         } catch (err) {
           console.error("Failed to import dropped file:", file.name, err);
@@ -347,11 +386,57 @@ export const EditorApp: React.FC = () => {
       }
 
       if (importedAssets.length > 0) {
+        recordSnapshot();
         dispatch({ type: "ADD_ASSETS", assets: importedAssets });
+        dispatch({
+          type: "RESTORE_SNAPSHOT",
+          snapshot: {
+            clips: [...state.clips, ...newClips],
+            tracks: state.tracks,
+            selectedClipId: newClips[0]?.id || state.selectedClipId,
+            totalDurationInFrames: Math.max(
+              state.totalDurationInFrames,
+              currentDropFrame + 30
+            ),
+          },
+        });
+        if (newClips[0]) {
+          handleSeek(newClips[0].timelineStartFrame);
+        }
       }
     },
-    [state.fps, handleAddAssetToTimeline]
+    [state.fps, state.tracks, state.clips, state.selectedClipId, state.totalDurationInFrames, recordSnapshot, handleSeek]
   );
+
+  // Window-level drag & drop for dropping files anywhere in the editor window
+  useEffect(() => {
+    const handleWindowDragOver = (e: DragEvent) => {
+      if (e.dataTransfer && e.dataTransfer.types.includes("Files")) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }
+    };
+
+    const handleWindowDrop = (e: DragEvent) => {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const target = e.target as HTMLElement | null;
+        // Let track lane or media panel local handlers take precedence
+        if (target && (target.closest(".track-lane") || target.closest(".sidebar-content-pane"))) {
+          return;
+        }
+        e.preventDefault();
+        const primaryTrackId = state.tracks.find((t) => t.type === "video")?.id || state.tracks[0]?.id || "track-v1";
+        handleDropFiles(primaryTrackId, state.currentFrame, e.dataTransfer.files);
+      }
+    };
+
+    window.addEventListener("dragover", handleWindowDragOver);
+    window.addEventListener("drop", handleWindowDrop);
+    return () => {
+      window.removeEventListener("dragover", handleWindowDragOver);
+      window.removeEventListener("drop", handleWindowDrop);
+    };
+  }, [state.tracks, state.currentFrame, handleDropFiles]);
 
   // Keyboard shortcuts listener
   useEffect(() => {

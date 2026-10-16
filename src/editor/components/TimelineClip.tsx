@@ -173,6 +173,11 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
         width: `${widthPx}px`,
       }}
       onPointerDown={handleBodyPointerDown}
+      onDragOver={(e) => {
+        // Prevent default so browser allows dropping onto tracks even when hovering over existing clips
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(clip.id);

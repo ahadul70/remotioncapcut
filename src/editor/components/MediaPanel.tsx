@@ -299,14 +299,13 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
                   className="media-card"
                   draggable
                   onDragStart={(e) => {
-                    e.dataTransfer.setData(
-                      "application/json",
-                      JSON.stringify({
-                        type: "media-asset",
-                        assetId: asset.id,
-                        assetType: asset.type,
-                      })
-                    );
+                    const data = JSON.stringify({
+                      type: "media-asset",
+                      assetId: asset.id,
+                      assetType: asset.type,
+                    });
+                    e.dataTransfer.setData("application/json", data);
+                    e.dataTransfer.setData("text/plain", asset.id);
                     e.dataTransfer.effectAllowed = "copy";
                     if (onDragAssetStart) {
                       onDragAssetStart(asset);
