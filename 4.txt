@@ -1,0 +1,137 @@
+How we'll judge Step 4
+Don't let Antigravity declare victory just because the build is green. Once it finishes, test these five things in the browser:
+1. Put two video clips on separate tracks and confirm the overlap behaves correctly.
+2. Add audio on another track and confirm it plays alongside the video.
+3. Mute the audio track and verify the sound actually stops.
+4. Hide a video track and verify its footage disappears without deleting the clips.
+5. Lock a track and try moving, trimming, splitting, and deleting its clips
+
+
+# Step 4: Proper Multitrack Timeline Editing
+
+Project: Existing React + TypeScript + Remotion video editor at `E:\remotion`.
+
+Current baseline:
+- Step 2 editing operations are implemented.
+- Step 3 media import and drag-to-timeline placement are implemented.
+- Step 3 commit: `66b2cdf`.
+- The existing sample video is `public/TEST.mp4`.
+- Do not assume previous agent reports prove current functionality.
+
+## Objective
+
+Implement a reliable multitrack editing workflow using the existing editor architecture. Users must be able to organize video and audio clips across multiple independent tracks while maintaining correct preview, timeline timing, undo/redo, and rendering behavior.
+
+## 1. Inspect before coding
+
+- Check Git status, current HEAD, and recent commits.
+- Inspect `editorTypes.ts`, `editorReducer.ts`, `EditorApp.tsx`, `Timeline.tsx`, `TimelineTrack.tsx`, `TimelineClip.tsx`, `Composition.tsx`, media import logic, and tests.
+- Determine how clips and tracks are currently represented.
+- Identify which multitrack capabilities already exist.
+- Create a Git checkpoint before substantial modifications if the working tree is clean. Do not discard uncommitted changes.
+- Write a short implementation plan based on the actual code before editing.
+
+## 2. Track data model
+
+Implement or refine a centralized track model with:
+- Stable track IDs.
+- Track type: video or audio.
+- Track name and ordering.
+- Locked state.
+- Visible state for video tracks.
+- Muted state for audio tracks.
+
+Reuse existing structures where possible. Avoid duplicating editing state or creating a parallel timeline model.
+
+Existing clips must reference valid tracks. Preserve stable clip IDs, integer-frame timing, source in/out points, and imported media references.
+
+Provide sensible default video and audio tracks. Allow users to add tracks when needed.
+
+## 3. Timeline interaction
+
+Implement:
+- Clear track headers and independent track lanes.
+- Add video/audio tracks.
+- Move clips horizontally and between compatible tracks.
+- Drop imported assets onto the intended track and frame.
+- Select clips and tracks clearly.
+- Preserve snapping, zoom, horizontal scrolling, ruler seeking, and drop indicators.
+- Prevent edits to locked tracks.
+- Prevent audio-only media from being placed on video tracks and video-only media from being placed on audio tracks, unless the existing architecture explicitly supports a different behavior.
+- Ensure drag operations do not accidentally trigger clip selection, playhead seeking, or unintended edits.
+
+Do not implement ripple editing or complex collision resolution unless the existing architecture already supports it reliably. Overlapping clips should follow a documented and consistent behavior.
+
+## 4. Track controls
+
+Implement functional controls:
+- Add video track.
+- Add audio track.
+- Lock/unlock a track.
+- Hide/show video tracks.
+- Mute/unmute audio tracks.
+
+These controls must affect real editor state, preview, or rendering as appropriate. Do not create decorative controls.
+
+Hiding a video track must not delete its clips. Muting an audio track must not delete its clips. Locked tracks must reject movement, trimming, splitting, and deletion of their clips through normal editing actions.
+
+## 5. Preview and rendering consistency
+
+- Update the Remotion composition to render clips according to their track ordering and track states.
+- Define and document how overlapping video clips are composited.
+- Define and document how multiple audio clips mix.
+- Ensure hidden video tracks are excluded from output and muted audio tracks are silent.
+- Preserve the existing `TEST.mp4` behavior and imported-media preview.
+- Keep all editor UI outside the exported composition.
+- Preserve frame-accurate timing and the existing project frame rate.
+
+Do not claim CLI export of browser-imported blob URLs works unless the export pipeline actually supports it.
+
+## 6. Undo and redo
+
+Track creation, track deletion if implemented, track state changes, and clip movement between tracks must integrate with the existing undo/redo system.
+
+Avoid adding a separate history implementation.
+
+## 7. Tests
+
+Add or update automated tests for:
+- Creating tracks and assigning stable IDs.
+- Moving a clip between compatible tracks.
+- Rejecting incompatible media/track combinations.
+- Preventing edits on locked tracks.
+- Hiding video tracks without deleting clips.
+- Muting audio tracks without deleting clips.
+- Undo/redo for track changes and clip movement.
+- Correct preview/render filtering and ordering for hidden, visible, muted, and overlapping tracks.
+
+Run available lint, type-check, automated tests, Vite build, and Remotion build commands after inspecting `package.json`.
+
+## 8. Scope boundaries
+
+Do not implement:
+- AI editing or API integrations.
+- Transitions or advanced effects.
+- Captions or text tools.
+- Cloud storage or project persistence.
+- A complete UI redesign.
+- Unnecessary libraries or backend services.
+
+Keep the interface consistent with the existing dark desktop editor.
+
+## 9. Final report
+
+Report:
+1. Files changed.
+2. Actual features implemented.
+3. Commands run and results.
+4. Automated tests passed and failed.
+5. Browser tests actually performed.
+6. Known bugs and limitations.
+7. Exact manual tests I should perform.
+
+Do not claim functionality was verified unless it was actually tested.
+
+## Acceptance criteria
+
+I can create video and audio tracks, import and place media on them, move clips between compatible tracks, lock tracks, hide video tracks, mute audio tracks, and use existing editing tools without breaking undo/redo. Preview and rendering must follow the same track and clip state.
