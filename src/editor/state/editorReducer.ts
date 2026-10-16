@@ -4,6 +4,7 @@ import {
   EditorState,
   HistorySnapshot,
   MediaAsset,
+  Track,
 } from "./editorTypes";
 
 export type Action =
@@ -14,7 +15,7 @@ export type Action =
   | { type: "SET_SIDEBAR_TAB"; tab: EditorState["activeSidebarTab"] }
   | { type: "SET_ZOOM"; zoom: number }
   | { type: "TOGGLE_SNAPPING" }
-  | { type: "MOVE_CLIP"; clipId: string; newStartFrame: number }
+  | { type: "MOVE_CLIP"; clipId: string; newStartFrame: number; targetTrackId?: string }
   | { type: "TRIM_CLIP_START"; clipId: string; newStartFrame: number }
   | { type: "TRIM_CLIP_END"; clipId: string; newDurationInFrames: number }
   | { type: "SPLIT_CLIP_AT_PLAYHEAD"; frame?: number }
@@ -23,6 +24,8 @@ export type Action =
   | { type: "TOGGLE_TRACK_MUTE"; trackId: string }
   | { type: "TOGGLE_TRACK_LOCK"; trackId: string }
   | { type: "TOGGLE_TRACK_VISIBLE"; trackId: string }
+  | { type: "ADD_TRACK"; trackType: "video" | "audio" }
+  | { type: "DELETE_TRACK"; trackId: string }
   | { type: "SET_EXPORT_DIALOG_OPEN"; isOpen: boolean }
   | { type: "RESTORE_SNAPSHOT"; snapshot: HistorySnapshot }
   | { type: "SET_TOTAL_DURATION"; duration: number }
@@ -74,6 +77,20 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const clip = state.clips.find((c) => c.id === action.clipId);
       if (!clip) return state;
 
+      // Reject if current track is locked
+      const currentTrack = state.tracks.find((t) => t.id === clip.trackId);
+      if (currentTrack?.locked) return state;
+
+      let targetTrackId = clip.trackId;
+      if (action.targetTrackId && action.targetTrackId !== clip.trackId) {
+        const destTrack = state.tracks.find((t) => t.id === action.targetTrackId);
+        // Destination track must exist, not be locked, and match media type
+        if (!destTrack || destTrack.locked || destTrack.type !== clip.type) {
+          return state;
+        }
+        targetTrackId = destTrack.id;
+      }
+
       let newStart = Math.max(0, action.newStartFrame);
 
       if (state.snappingEnabled) {
@@ -81,9 +98,9 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         const snapThreshold = Math.max(3, Math.round(10 / state.zoom));
         const snapPoints = [0, state.currentFrame];
 
-        // Collect other clips' boundaries
+        // Collect other clips' boundaries on the target track
         for (const other of state.clips) {
-          if (other.id !== clip.id) {
+          if (other.id !== clip.id && other.trackId === targetTrackId) {
             snapPoints.push(other.timelineStartFrame);
             snapPoints.push(other.timelineStartFrame + other.durationInFrames);
           }
@@ -108,7 +125,9 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       }
 
       const updatedClips = state.clips.map((c) =>
-        c.id === action.clipId ? { ...c, timelineStartFrame: newStart } : c
+        c.id === action.clipId
+          ? { ...c, timelineStartFrame: newStart, trackId: targetTrackId }
+          : c
       );
 
       return {
@@ -122,6 +141,10 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     case "TRIM_CLIP_START": {
       const clip = state.clips.find((c) => c.id === action.clipId);
       if (!clip) return state;
+
+      // Reject if track is locked
+      const track = state.tracks.find((t) => t.id === clip.trackId);
+      if (track?.locked) return state;
 
       const requestedStart = Math.max(0, action.newStartFrame);
       const diff = requestedStart - clip.timelineStartFrame;
@@ -156,6 +179,10 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const clip = state.clips.find((c) => c.id === action.clipId);
       if (!clip) return state;
 
+      // Reject if track is locked
+      const track = state.tracks.find((t) => t.id === clip.trackId);
+      if (track?.locked) return state;
+
       const maxAvailable = clip.sourceDurationInFrames - clip.sourceStartFrame;
       const newDuration = Math.max(5, Math.min(action.newDurationInFrames, maxAvailable));
 
@@ -188,6 +215,10 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       }
 
       if (!clip) return state;
+
+      // Reject if clip's track is locked
+      const track = state.tracks.find((t) => t.id === clip.trackId);
+      if (track?.locked) return state;
 
       const offset = playhead - clip.timelineStartFrame;
       const firstDuration = offset;
@@ -233,6 +264,13 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const targetId = action.clipId || state.selectedClipId;
       if (!targetId) return state;
 
+      const clip = state.clips.find((c) => c.id === targetId);
+      if (!clip) return state;
+
+      // Reject if clip's track is locked
+      const track = state.tracks.find((t) => t.id === clip.trackId);
+      if (track?.locked) return state;
+
       const updatedClips = state.clips.filter((c) => c.id !== targetId);
 
       return {
@@ -245,8 +283,23 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     }
 
     case "UPDATE_CLIP_PROPERTIES": {
+      const clip = state.clips.find((c) => c.id === action.clipId);
+      if (!clip) return state;
+
+      const currentTrack = state.tracks.find((t) => t.id === clip.trackId);
+      if (currentTrack?.locked) return state;
+
+      // Check track change validity
+      const validProps = { ...action.properties };
+      if (validProps.trackId && validProps.trackId !== clip.trackId) {
+        const destTrack = state.tracks.find((t) => t.id === validProps.trackId);
+        if (!destTrack || destTrack.locked || destTrack.type !== clip.type) {
+          delete validProps.trackId;
+        }
+      }
+
       const updatedClips = state.clips.map((c) =>
-        c.id === action.clipId ? { ...c, ...action.properties } : c
+        c.id === action.clipId ? { ...c, ...validProps } : c
       );
       return {
         ...state,
@@ -259,21 +312,90 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const updatedTracks = state.tracks.map((t) =>
         t.id === action.trackId ? { ...t, muted: !t.muted } : t
       );
-      return { ...state, tracks: updatedTracks };
+      return { ...state, tracks: updatedTracks, saveStatus: "unsaved" };
     }
 
     case "TOGGLE_TRACK_LOCK": {
       const updatedTracks = state.tracks.map((t) =>
         t.id === action.trackId ? { ...t, locked: !t.locked } : t
       );
-      return { ...state, tracks: updatedTracks };
+      return { ...state, tracks: updatedTracks, saveStatus: "unsaved" };
     }
 
     case "TOGGLE_TRACK_VISIBLE": {
       const updatedTracks = state.tracks.map((t) =>
         t.id === action.trackId ? { ...t, visible: t.visible === false ? true : false } : t
       );
-      return { ...state, tracks: updatedTracks };
+      return { ...state, tracks: updatedTracks, saveStatus: "unsaved" };
+    }
+
+    case "ADD_TRACK": {
+      const isVideo = action.trackType === "video";
+      const existingSameType = state.tracks.filter((t) => t.type === action.trackType);
+      const nextNum = existingSameType.length + 1;
+      const prefix = isVideo ? "track-v" : "track-a";
+      let trackId = `${prefix}${nextNum}`;
+      while (state.tracks.some((t) => t.id === trackId)) {
+        trackId = `${prefix}${random(null).toString(36).substring(2, 6)}`;
+      }
+
+      const name = isVideo ? `V${nextNum} Video` : `A${nextNum} Audio`;
+      const newTrack: Track = {
+        id: trackId,
+        type: action.trackType,
+        name,
+        visible: true,
+        muted: false,
+        locked: false,
+      };
+
+      let updatedTracks: Track[];
+      if (isVideo) {
+        // Place new video track after existing video tracks
+        const lastVideoIdx = state.tracks.reduce((max, t, i) => (t.type === "video" ? i : max), -1);
+        if (lastVideoIdx >= 0) {
+          updatedTracks = [
+            ...state.tracks.slice(0, lastVideoIdx + 1),
+            newTrack,
+            ...state.tracks.slice(lastVideoIdx + 1),
+          ];
+        } else {
+          updatedTracks = [newTrack, ...state.tracks];
+        }
+      } else {
+        // Append audio track at the bottom
+        updatedTracks = [...state.tracks, newTrack];
+      }
+
+      return {
+        ...state,
+        tracks: updatedTracks,
+        saveStatus: "unsaved",
+      };
+    }
+
+    case "DELETE_TRACK": {
+      const targetTrack = state.tracks.find((t) => t.id === action.trackId);
+      if (!targetTrack || targetTrack.locked) return state;
+
+      // Keep at least 1 track of each type
+      const sameTypeTracks = state.tracks.filter((t) => t.type === targetTrack.type);
+      if (sameTypeTracks.length <= 1) return state;
+
+      const updatedTracks = state.tracks.filter((t) => t.id !== action.trackId);
+      const updatedClips = state.clips.filter((c) => c.trackId !== action.trackId);
+
+      return {
+        ...state,
+        tracks: updatedTracks,
+        clips: updatedClips,
+        selectedClipId:
+          state.selectedClipId && updatedClips.some((c) => c.id === state.selectedClipId)
+            ? state.selectedClipId
+            : null,
+        totalDurationInFrames: recalculateDuration(updatedClips, state.totalDurationInFrames),
+        saveStatus: "unsaved",
+      };
     }
 
     case "SET_EXPORT_DIALOG_OPEN": {

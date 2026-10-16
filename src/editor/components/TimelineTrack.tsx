@@ -10,7 +10,7 @@ type TimelineTrackProps = {
   selectedClipId: string | null;
   onSelectClip: (id: string) => void;
   onMoveStart: () => void;
-  onMoveClip: (id: string, newStartFrame: number) => void;
+  onMoveClip: (id: string, newStartFrame: number, targetTrackId?: string) => void;
   onCommitMove: () => void;
   onCancelMove: () => void;
   onTrimBegin: () => void;
@@ -114,7 +114,10 @@ export const TimelineTrack: React.FC<TimelineTrackProps> = ({
   return (
     <div
       ref={laneRef}
-      className={`track-lane ${isDragOver ? "drag-over" : ""}`}
+      className={`track-lane ${isDragOver ? "drag-over" : ""} ${track.locked ? "locked" : ""}`}
+      data-track-id={track.id}
+      data-track-type={track.type}
+      data-track-locked={track.locked ? "true" : "false"}
       style={{
         width: `${totalWidthPx}px`,
         opacity: track.visible === false ? 0.35 : 1,
@@ -147,6 +150,7 @@ export const TimelineTrack: React.FC<TimelineTrackProps> = ({
           clip={clip}
           zoom={zoom}
           isSelected={clip.id === selectedClipId}
+          isLocked={track.locked}
           onSelect={onSelectClip}
           onMoveStart={onMoveStart}
           onMove={onMoveClip}

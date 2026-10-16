@@ -5,9 +5,10 @@ type TimelineClipProps = {
   clip: Clip;
   zoom: number;
   isSelected: boolean;
+  isLocked?: boolean;
   onSelect: (id: string) => void;
   onMoveStart: () => void;
-  onMove: (id: string, newStartFrame: number) => void;
+  onMove: (id: string, newStartFrame: number, targetTrackId?: string) => void;
   onCommitMove: () => void;
   onCancelMove: () => void;
   onTrimBegin: () => void;
@@ -21,6 +22,7 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
   clip,
   zoom,
   isSelected,
+  isLocked,
   onSelect,
   onMoveStart,
   onMove,
@@ -45,6 +47,9 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
     e.stopPropagation();
     onSelect(clip.id);
 
+    // Reject move if clip's track is locked
+    if (isLocked) return;
+
     const startX = e.clientX;
     const initialStart = clip.timelineStartFrame;
     let hasMoved = false;
@@ -55,9 +60,23 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const deltaX = moveEvent.clientX - startX;
       const deltaFrames = Math.round(deltaX / zoom);
-      if (Math.abs(deltaFrames) > 0) {
+
+      // Detect hovering track lane for vertical cross-track moving
+      let targetTrackId = clip.trackId;
+      const elements = document.elementsFromPoint(moveEvent.clientX, moveEvent.clientY);
+      const laneEl = elements.find((el) => el.classList.contains("track-lane"));
+      if (laneEl) {
+        const laneTrackId = laneEl.getAttribute("data-track-id");
+        const laneTrackType = laneEl.getAttribute("data-track-type");
+        const laneIsLocked = laneEl.getAttribute("data-track-locked") === "true";
+        if (laneTrackId && laneTrackType === clip.type && !laneIsLocked) {
+          targetTrackId = laneTrackId;
+        }
+      }
+
+      if (Math.abs(deltaFrames) > 0 || targetTrackId !== clip.trackId) {
         hasMoved = true;
-        onMove(clip.id, initialStart + deltaFrames);
+        onMove(clip.id, initialStart + deltaFrames, targetTrackId);
       }
     };
 
@@ -75,10 +94,11 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
     window.addEventListener("pointerup", handlePointerUp);
   };
 
-  // Left trim handle listener
+  // Left Trim Handle listener
   const handleLeftTrimPointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     onSelect(clip.id);
+    if (isLocked) return;
 
     const startX = e.clientX;
     const initialStart = clip.timelineStartFrame;
@@ -109,10 +129,11 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
     window.addEventListener("pointerup", handlePointerUp);
   };
 
-  // Right trim handle listener
+  // Right Trim Handle listener
   const handleRightTrimPointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     onSelect(clip.id);
+    if (isLocked) return;
 
     const startX = e.clientX;
     const initialDuration = clip.durationInFrames;
@@ -146,7 +167,7 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
   return (
     <div
       ref={clipRef}
-      className={`timeline-clip ${clip.type} ${isSelected ? "selected" : ""}`}
+      className={`timeline-clip ${clip.type} ${isSelected ? "selected" : ""} ${isLocked ? "locked" : ""}`}
       style={{
         left: `${leftPx}px`,
         width: `${widthPx}px`,
@@ -157,16 +178,24 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
         onSelect(clip.id);
       }}
     >
-      {/* Left Trim Handle */}
-      <div
-        className="trim-handle left"
-        onPointerDown={handleLeftTrimPointerDown}
-        onClick={(e) => e.stopPropagation()}
-        title="Drag to trim start"
-      />
+      {/* Left Trim Handle (only enabled when not locked) */}
+      {!isLocked && (
+        <div
+          className="trim-handle left"
+          onPointerDown={handleLeftTrimPointerDown}
+          onClick={(e) => e.stopPropagation()}
+          title="Drag to trim start"
+        />
+      )}
 
       {/* Clip Content */}
       <div className="clip-content">
+        {isLocked && (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: "5px", flexShrink: 0, opacity: 0.85 }}>
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        )}
         <span style={{ fontWeight: 600 }}>{clip.name}</span>
         {widthPx > 80 && (
           <span style={{ opacity: 0.7, marginLeft: "6px", fontSize: "10px", fontFamily: "var(--font-mono)" }}>
@@ -175,13 +204,15 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
         )}
       </div>
 
-      {/* Right Trim Handle */}
-      <div
-        className="trim-handle right"
-        onPointerDown={handleRightTrimPointerDown}
-        onClick={(e) => e.stopPropagation()}
-        title="Drag to trim end"
-      />
+      {/* Right Trim Handle (only enabled when not locked) */}
+      {!isLocked && (
+        <div
+          className="trim-handle right"
+          onPointerDown={handleRightTrimPointerDown}
+          onClick={(e) => e.stopPropagation()}
+          title="Drag to trim end"
+        />
+      )}
     </div>
   );
 };

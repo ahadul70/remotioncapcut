@@ -223,6 +223,47 @@ export const EditorApp: React.FC = () => {
     [recordSnapshot, state.selectedClipId]
   );
 
+  // Track management handlers with undo/redo
+  const handleAddTrack = useCallback(
+    (trackType: "video" | "audio") => {
+      recordSnapshot();
+      dispatch({ type: "ADD_TRACK", trackType });
+    },
+    [recordSnapshot]
+  );
+
+  const handleDeleteTrack = useCallback(
+    (trackId: string) => {
+      recordSnapshot();
+      dispatch({ type: "DELETE_TRACK", trackId });
+    },
+    [recordSnapshot]
+  );
+
+  const handleToggleTrackMute = useCallback(
+    (trackId: string) => {
+      recordSnapshot();
+      dispatch({ type: "TOGGLE_TRACK_MUTE", trackId });
+    },
+    [recordSnapshot]
+  );
+
+  const handleToggleTrackLock = useCallback(
+    (trackId: string) => {
+      recordSnapshot();
+      dispatch({ type: "TOGGLE_TRACK_LOCK", trackId });
+    },
+    [recordSnapshot]
+  );
+
+  const handleToggleTrackVisible = useCallback(
+    (trackId: string) => {
+      recordSnapshot();
+      dispatch({ type: "TOGGLE_TRACK_VISIBLE", trackId });
+    },
+    [recordSnapshot]
+  );
+
   // Add asset to timeline (supports target track and frame from drag-and-drop)
   const handleAddAssetToTimeline = useCallback(
     (asset: MediaAsset, targetTrackId?: string, targetStartFrame?: number) => {
@@ -422,6 +463,7 @@ export const EditorApp: React.FC = () => {
 
         <PropertiesPanel
           selectedClip={selectedClip}
+          tracks={state.tracks}
           onUpdateProperties={handleUpdateProperties}
           onDeleteClip={handleDelete}
           onSplitClip={handleSplit}
@@ -436,8 +478,8 @@ export const EditorApp: React.FC = () => {
         onSeek={handleSeek}
         onSelectClip={(id) => dispatch({ type: "SELECT_CLIP", id })}
         onMoveStart={handleMoveStart}
-        onMoveClip={(clipId, newStartFrame) =>
-          dispatch({ type: "MOVE_CLIP", clipId, newStartFrame })
+        onMoveClip={(clipId, newStartFrame, targetTrackId) =>
+          dispatch({ type: "MOVE_CLIP", clipId, newStartFrame, targetTrackId })
         }
         onCommitMove={handleCommitMove}
         onCancelMove={handleCancelMove}
@@ -454,9 +496,11 @@ export const EditorApp: React.FC = () => {
         onDelete={handleDelete}
         onToggleSnapping={() => dispatch({ type: "TOGGLE_SNAPPING" })}
         onZoomChange={(zoom) => dispatch({ type: "SET_ZOOM", zoom })}
-        onToggleMute={(trackId) => dispatch({ type: "TOGGLE_TRACK_MUTE", trackId })}
-        onToggleLock={(trackId) => dispatch({ type: "TOGGLE_TRACK_LOCK", trackId })}
-        onToggleVisible={(trackId) => dispatch({ type: "TOGGLE_TRACK_VISIBLE", trackId })}
+        onToggleMute={handleToggleTrackMute}
+        onToggleLock={handleToggleTrackLock}
+        onToggleVisible={handleToggleTrackVisible}
+        onAddTrack={handleAddTrack}
+        onDeleteTrack={handleDeleteTrack}
         onDropAsset={handleDropAsset}
         onDropFiles={handleDropFiles}
       />

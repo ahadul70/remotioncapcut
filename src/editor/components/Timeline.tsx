@@ -11,7 +11,7 @@ type TimelineProps = {
   onSeek: (frame: number) => void;
   onSelectClip: (id: string | null) => void;
   onMoveStart: () => void;
-  onMoveClip: (id: string, newStartFrame: number) => void;
+  onMoveClip: (id: string, newStartFrame: number, targetTrackId?: string) => void;
   onCommitMove: () => void;
   onCancelMove: () => void;
   onTrimBegin: () => void;
@@ -26,6 +26,8 @@ type TimelineProps = {
   onToggleMute: (trackId: string) => void;
   onToggleLock: (trackId: string) => void;
   onToggleVisible: (trackId: string) => void;
+  onAddTrack: (trackType: "video" | "audio") => void;
+  onDeleteTrack?: (trackId: string) => void;
   onDropAsset?: (trackId: string, frame: number, asset: MediaAsset) => void;
   onDropFiles?: (trackId: string, frame: number, files: FileList) => void;
 };
@@ -51,6 +53,8 @@ export const Timeline: React.FC<TimelineProps> = ({
   onToggleMute,
   onToggleLock,
   onToggleVisible,
+  onAddTrack,
+  onDeleteTrack,
   onDropAsset,
   onDropFiles,
 }) => {
@@ -164,6 +168,26 @@ export const Timeline: React.FC<TimelineProps> = ({
               <line x1="6" y1="7" x2="18" y2="7" />
             </svg>
           </button>
+
+          <div style={{ width: "1px", height: "18px", background: "var(--border-color)", margin: "0 4px" }} />
+
+          <button
+            className="btn"
+            style={{ fontSize: "11px", padding: "3px 8px" }}
+            onClick={() => onAddTrack("video")}
+            title="Add Video Track"
+          >
+            + Video Track
+          </button>
+
+          <button
+            className="btn"
+            style={{ fontSize: "11px", padding: "3px 8px" }}
+            onClick={() => onAddTrack("audio")}
+            title="Add Audio Track"
+          >
+            + Audio Track
+          </button>
         </div>
 
         <div className="toolbar-zoom">
@@ -269,6 +293,17 @@ export const Timeline: React.FC<TimelineProps> = ({
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                 </button>
+
+                {state.tracks.filter((t) => t.type === track.type).length > 1 && !track.locked && (
+                  <button
+                    className="btn btn-icon btn-danger"
+                    style={{ width: "20px", height: "20px", fontSize: "10px", opacity: 0.7 }}
+                    onClick={() => onDeleteTrack && onDeleteTrack(track.id)}
+                    title={`Delete ${track.name}`}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             </div>
           ))}
