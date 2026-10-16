@@ -1,0 +1,157 @@
+# STEP 2: Make the CapCut-Style Editor Functional
+
+You are continuing development of my existing video editor in `E:\remotion`.
+
+The UI shell has been created. Now I want you to make the core editing experience functional.
+
+## 1. Inspect Before Editing
+
+First, inspect the current implementation. Identify the editor entry point, preview component, timeline components, state management, and Remotion composition.
+
+Preserve the existing design. Do not redesign the application or replace working components unnecessarily.
+
+Keep the editor UI separate from the Remotion composition so that the interface never appears in the exported video.
+
+Preserve playback of `public/TEST.mp4` and its correct full duration.
+
+## 2. Create One Source of Truth
+
+Implement a centralized editing state model that drives the preview, timeline, playhead, and properties inspector.
+
+Each clip should have:
+- A unique ID.
+- A source asset reference.
+- A track ID.
+- A timeline start frame.
+- A source start frame.
+- A duration in frames.
+- A media type.
+- A clip name.
+
+Use integer frames for timeline calculations. Use the project's actual frame rate rather than assuming one.
+
+The timeline must display the same clip data that the preview uses. Do not build separate, disconnected mock data for the interface.
+
+## 3. Make the Preview Work
+
+Use the existing `@remotion/player` installation if appropriate.
+
+Implement:
+- Play and pause.
+- Current timecode.
+- Playhead synchronization.
+- Seeking by clicking the timeline ruler.
+- Seeking by dragging the playhead.
+- Previous-frame and next-frame controls, where practical.
+
+The preview must reflect the current editing sequence.
+
+Initially, make the existing `TEST.mp4` work as a real clip in the editing model. Ensure the full video duration is preserved.
+
+## 4. Implement Real Timeline Editing
+
+Implement the following operations in this order:
+
+### A. Select clips
+Clicking a clip selects it and updates the properties inspector.
+
+### B. Move clips
+Allow users to drag clips horizontally to change their timeline positions.
+
+The new position must update the underlying state, preview, and timeline.
+
+### C. Split clips
+Split the selected clip at the playhead.
+
+The operation must create two valid clips with unique IDs and correct source in-points, timeline positions, and durations.
+
+The total visible content must remain correct after splitting.
+
+### D. Delete clips
+Support the Delete or Backspace key and the Delete toolbar action.
+
+Do not delete clips when the user is typing inside an input.
+
+### E. Undo and redo
+Implement real undo and redo for clip movement, splitting, and deletion.
+
+One completed drag should normally count as one undoable action, not dozens of separate actions.
+
+### F. Timeline zoom and scrolling
+Implement zoom in, zoom out, and fit-to-content.
+
+Keep the ruler, clips, and playhead aligned during zooming and scrolling. Zoom must never change actual clip positions or durations.
+
+### G. Snapping
+If feasible, implement snapping to the playhead, timeline start, and other clip boundaries.
+
+The snapping toggle must actually change behavior.
+
+## 5. Connect the Properties Inspector
+
+When a clip is selected, show its actual:
+- Name.
+- Media type.
+- Timeline start.
+- Duration.
+- Source in-point.
+
+Only enable editing controls that are connected to real behavior. Do not create fake sliders or buttons.
+
+## 6. Keyboard Shortcuts
+
+Implement:
+- Space: Play/pause.
+- Ctrl+Z: Undo.
+- Ctrl+Shift+Z: Redo.
+- Ctrl+Y: Redo.
+- Delete/Backspace: Delete selected clip.
+- Left/Right arrows: Step one frame backward/forward.
+- S: Split at the playhead.
+
+Avoid triggering shortcuts while the user is typing into a text field.
+
+## 7. Technical Rules
+
+- Use the existing React, TypeScript, and Remotion architecture.
+- Keep the UI outside the rendered composition.
+- Avoid unnecessary dependencies.
+- Do not integrate Gemini or other AI APIs yet.
+- Do not add advanced effects, captions, or audio mixing yet.
+- Do not rewrite the project from scratch.
+- Keep components reasonably small and maintainable.
+- Preserve the current UI styling.
+- Maintain a recoverable Git checkpoint.
+
+## 8. Test the Actual Application
+
+Run `npm run lint` and fix errors introduced by your changes.
+
+Use any existing build or type-check scripts where available.
+
+Manually test the following:
+1. The video plays for its full duration.
+2. Clicking the ruler seeks the preview.
+3. Moving a clip changes its actual timeline position.
+4. Splitting creates two valid clips.
+5. Deleting a clip removes it.
+6. Undo and redo restore the correct state.
+7. Zooming does not change the edit.
+8. The editor UI is not part of the rendered video.
+
+Do not claim that a feature works unless you have tested it.
+
+## 9. Work Incrementally
+
+Implement and verify the core editing operations before adding optional refinements.
+
+If a major operation fails, fix it before proceeding to the next one.
+
+At the end, report:
+- What was implemented.
+- What was tested.
+- What remains incomplete.
+- Any known bugs.
+- How to launch the editor.
+
+**Definition of done:** I can open the editor, play `TEST.mp4`, select a clip, move it, split it, delete it, undo and redo changes, and seek using the timeline. These operations must change the actual editing state, not merely the appearance of the UI.
