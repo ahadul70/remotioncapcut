@@ -17,7 +17,7 @@ export type Action =
   | { type: "MOVE_CLIP"; clipId: string; newStartFrame: number }
   | { type: "TRIM_CLIP_START"; clipId: string; newStartFrame: number }
   | { type: "TRIM_CLIP_END"; clipId: string; newDurationInFrames: number }
-  | { type: "SPLIT_CLIP_AT_PLAYHEAD" }
+  | { type: "SPLIT_CLIP_AT_PLAYHEAD"; frame?: number }
   | { type: "DELETE_CLIP"; clipId?: string }
   | { type: "UPDATE_CLIP_PROPERTIES"; clipId: string; properties: Partial<Clip> }
   | { type: "TOGGLE_TRACK_MUTE"; trackId: string }
@@ -171,7 +171,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     }
 
     case "SPLIT_CLIP_AT_PLAYHEAD": {
-      const playhead = state.currentFrame;
+      const playhead = action.frame !== undefined ? action.frame : state.currentFrame;
 
       // Find target clip: either currently selected clip, or clip located under the playhead
       let clip = state.selectedClipId

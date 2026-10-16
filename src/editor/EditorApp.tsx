@@ -197,8 +197,9 @@ export const EditorApp: React.FC = () => {
   // Split operation with history
   const handleSplit = useCallback(() => {
     recordSnapshot();
-    dispatch({ type: "SPLIT_CLIP_AT_PLAYHEAD" });
-  }, [recordSnapshot]);
+    const curFrame = playerRef.current ? playerRef.current.getCurrentFrame() : state.currentFrame;
+    dispatch({ type: "SPLIT_CLIP_AT_PLAYHEAD", frame: curFrame });
+  }, [recordSnapshot, playerRef, state.currentFrame]);
 
   // Delete operation with history
   const handleDelete = useCallback(() => {
@@ -301,13 +302,15 @@ export const EditorApp: React.FC = () => {
       // Left Arrow: Step back 1 frame
       if (e.code === "ArrowLeft") {
         e.preventDefault();
-        handleSeek(Math.max(0, state.currentFrame - 1));
+        const cur = playerRef.current ? playerRef.current.getCurrentFrame() : state.currentFrame;
+        handleSeek(Math.max(0, cur - 1));
       }
 
       // Right Arrow: Step forward 1 frame
       if (e.code === "ArrowRight") {
         e.preventDefault();
-        handleSeek(Math.min(state.totalDurationInFrames, state.currentFrame + 1));
+        const cur = playerRef.current ? playerRef.current.getCurrentFrame() : state.currentFrame;
+        handleSeek(Math.min(state.totalDurationInFrames, cur + 1));
       }
 
       // Ctrl+Z: Undo
