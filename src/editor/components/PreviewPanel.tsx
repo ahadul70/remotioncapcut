@@ -115,6 +115,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
             }}
             controls={false}
             loop
+            acknowledgeRemotionLicense
           />
         </div>
       </div>
