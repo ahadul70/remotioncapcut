@@ -1,25 +1,184 @@
 import React from "react";
-import { Clip, Track } from "../state/editorTypes";
+import { Clip, ClipTransition, EffectType, Track, TransitionType } from "../state/editorTypes";
+import {
+  EFFECT_METADATA,
+  TRANSITION_TYPES,
+  getMaxTransitionDuration,
+} from "../utils/effectAndTransitionUtils";
 
 type PropertiesPanelProps = {
   selectedClip: Clip | null;
+  selectedTransition: ClipTransition | null;
+  allClips: Clip[];
+  transitions: ClipTransition[];
   tracks: Track[];
   fps: number;
   onUpdateProperties: (properties: Partial<Clip>) => void;
+  onUpdateEffect: (effectType: EffectType, enabled?: boolean, value?: number) => void;
+  onRemoveEffect: (effectType: EffectType) => void;
+  onResetEffects: () => void;
+  onAddTransition: (transition: Omit<ClipTransition, "id">) => void;
+  onUpdateTransition: (id: string, properties: Partial<Omit<ClipTransition, "id">>) => void;
+  onDeleteTransition: (id: string) => void;
   onDeleteClip: () => void;
   onSplitClip: () => void;
   currentFrame: number;
 };
 
+const EFFECT_KEYS: EffectType[] = [
+  "brightness",
+  "contrast",
+  "saturation",
+  "grayscale",
+  "blur",
+  "vignette",
+];
+
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   selectedClip,
+  selectedTransition,
+  allClips,
+  transitions,
   tracks,
   fps,
   onUpdateProperties,
+  onUpdateEffect,
+  onResetEffects,
+  onAddTransition,
+  onUpdateTransition,
+  onDeleteTransition,
   onDeleteClip,
   onSplitClip,
   currentFrame,
 }) => {
+  // 1. Transition Inspector
+  if (selectedTransition) {
+    const track = tracks.find((t) => t.id === selectedTransition.trackId);
+    const isTrackLocked = track?.locked === true;
+    const fromClip = allClips.find((c) => c.id === selectedTransition.fromClipId);
+    const toClip = allClips.find((c) => c.id === selectedTransition.toClipId);
+
+    let maxDuration = 120;
+    if (fromClip) maxDuration = Math.min(maxDuration, getMaxTransitionDuration(fromClip.durationInFrames));
+    if (toClip) maxDuration = Math.min(maxDuration, getMaxTransitionDuration(toClip.durationInFrames));
+
+    const durationSec = (selectedTransition.durationInFrames / fps).toFixed(2);
+
+    return (
+      <aside className="properties-inspector">
+        <div className="pane-header">
+          <span className="pane-title">Transition</span>
+          <span style={{ fontSize: "11px", color: "var(--accent)" }}>
+            {selectedTransition.type.toUpperCase()}
+          </span>
+        </div>
+
+        {isTrackLocked && (
+          <div
+            style={{
+              margin: "0 12px 12px",
+              padding: "8px 10px",
+              background: "rgba(233, 184, 106, 0.15)",
+              border: "1px solid var(--warning)",
+              borderRadius: "var(--radius-sm)",
+              fontSize: "11px",
+              color: "var(--warning)",
+            }}
+          >
+            Track is locked. Editing disabled.
+          </div>
+        )}
+
+        <div className="inspector-section">
+          <div className="section-label">Transition Settings</div>
+
+          <div className="prop-row">
+            <span className="prop-label">Type</span>
+            <select
+              className="prop-input"
+              disabled={isTrackLocked}
+              style={{
+                width: "140px",
+                textAlign: "left",
+                background: "var(--bg-elevated)",
+                color: "var(--text-primary)",
+              }}
+              value={selectedTransition.type}
+              onChange={(e) =>
+                onUpdateTransition(selectedTransition.id, {
+                  type: e.target.value as TransitionType,
+                })
+              }
+            >
+              {TRANSITION_TYPES.map((t) => (
+                <option key={t.type} value={t.type}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="prop-row">
+            <span className="prop-label">Duration</span>
+            <input
+              type="range"
+              min="3"
+              max={Math.max(3, maxDuration)}
+              step="1"
+              disabled={isTrackLocked}
+              style={{ width: "85px", accentColor: "var(--accent)" }}
+              value={selectedTransition.durationInFrames}
+              onChange={(e) =>
+                onUpdateTransition(selectedTransition.id, {
+                  durationInFrames: parseInt(e.target.value, 10),
+                })
+              }
+            />
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", minWidth: "55px", textAlign: "right" }}>
+              {selectedTransition.durationInFrames}f ({durationSec}s)
+            </span>
+          </div>
+
+          <div className="prop-row">
+            <span className="prop-label">Track</span>
+            <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+              {track ? track.name : selectedTransition.trackId}
+            </span>
+          </div>
+
+          {fromClip && (
+            <div className="prop-row">
+              <span className="prop-label">Outgoing Clip</span>
+              <span style={{ fontSize: "11px", color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "120px" }}>
+                {fromClip.name}
+              </span>
+            </div>
+          )}
+
+          {toClip && (
+            <div className="prop-row">
+              <span className="prop-label">Incoming Clip</span>
+              <span style={{ fontSize: "11px", color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "120px" }}>
+                {toClip.name}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <button
+            className="btn btn-danger"
+            disabled={isTrackLocked}
+            onClick={() => onDeleteTransition(selectedTransition.id)}
+          >
+            Delete Transition
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+  // 2. Empty State
   if (!selectedClip) {
     return (
       <aside className="properties-inspector" style={{ justifyContent: "center", alignItems: "center", textAlign: "center" }}>
@@ -31,12 +190,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           No Clip Selected
         </p>
         <p style={{ fontSize: "11px", color: "var(--text-muted)", maxWidth: "180px" }}>
-          Select a clip on the timeline to view and adjust its properties.
+          Select a clip or transition on the timeline to view and adjust its properties.
         </p>
       </aside>
     );
   }
 
+  // 3. Clip Inspector
   const currentTrack = tracks.find((t) => t.id === selectedClip.trackId);
   const isTrackLocked = currentTrack?.locked === true;
   const compatibleTracks = tracks.filter((t) => t.type === selectedClip.type);
@@ -44,6 +204,22 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const isPlayheadInside =
     currentFrame > selectedClip.timelineStartFrame &&
     currentFrame < selectedClip.timelineStartFrame + selectedClip.durationInFrames;
+
+  // Transitions related to this clip
+  const clipTransitions = transitions.filter(
+    (t) => t.fromClipId === selectedClip.id || t.toClipId === selectedClip.id
+  );
+
+  // Check adjacent clip on same track for easy between-clip transition creation
+  const clipEnd = selectedClip.timelineStartFrame + selectedClip.durationInFrames;
+  const nextAdjacentClip = allClips.find(
+    (c) => c.trackId === selectedClip.trackId && c.id !== selectedClip.id && Math.abs(c.timelineStartFrame - clipEnd) <= 2
+  );
+  const hasTransitionToNext = transitions.some(
+    (t) => t.fromClipId === selectedClip.id && t.toClipId === nextAdjacentClip?.id
+  );
+
+  const maxTransDuration = getMaxTransitionDuration(selectedClip.durationInFrames);
 
   return (
     <aside className="properties-inspector">
@@ -54,7 +230,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </span>
       </div>
 
-      {/* Locked Track Warning Banner */}
       {isTrackLocked && (
         <div
           style={{
@@ -126,12 +301,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             {selectedClip.durationInFrames}f ({(selectedClip.durationInFrames / fps).toFixed(2)}s)
           </span>
         </div>
-        <div className="prop-row">
-          <span className="prop-label">Source In-Point</span>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: "12px" }}>
-            {selectedClip.sourceStartFrame}f
-          </span>
-        </div>
       </div>
 
       {/* Transform */}
@@ -193,6 +362,172 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </div>
       </div>
 
+      {/* Step 7: Video Effects Section (for visual clips) */}
+      {selectedClip.type !== "audio" && (
+        <div className="inspector-section">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <span className="section-label" style={{ marginBottom: 0 }}>Video Effects</span>
+            {(selectedClip.effects?.length ?? 0) > 0 && (
+              <button
+                className="btn btn-icon"
+                style={{ fontSize: "10px", padding: "2px 6px", height: "auto" }}
+                disabled={isTrackLocked}
+                onClick={onResetEffects}
+                title="Reset all effects to defaults"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+
+          {EFFECT_KEYS.map((key) => {
+            const meta = EFFECT_METADATA[key];
+            const eff = selectedClip.effects?.find((e) => e.type === key);
+            const isEnabled = eff?.enabled ?? false;
+            const currentVal = eff?.value ?? meta.defaultVal;
+
+            return (
+              <div key={key} style={{ marginBottom: "6px" }}>
+                <div className="prop-row" style={{ marginBottom: "2px" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: isTrackLocked ? "not-allowed" : "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={isEnabled}
+                      disabled={isTrackLocked}
+                      onChange={(e) => onUpdateEffect(key, e.target.checked, currentVal)}
+                      style={{ accentColor: "var(--accent)" }}
+                    />
+                    <span className="prop-label" style={{ color: isEnabled ? "var(--text-primary)" : "var(--text-muted)" }}>
+                      {meta.label}
+                    </span>
+                  </label>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: isEnabled ? "var(--text-primary)" : "var(--text-muted)" }}>
+                    {currentVal}{meta.unit}
+                  </span>
+                </div>
+
+                {isEnabled && (
+                  <div style={{ paddingLeft: "20px" }}>
+                    <input
+                      type="range"
+                      min={meta.min}
+                      max={meta.max}
+                      step={meta.step}
+                      disabled={isTrackLocked}
+                      style={{ width: "100%", accentColor: "var(--accent)" }}
+                      value={currentVal}
+                      onChange={(e) => onUpdateEffect(key, true, parseFloat(e.target.value))}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Step 7: Transitions Section (for visual clips) */}
+      {selectedClip.type !== "audio" && (
+        <div className="inspector-section">
+          <div className="section-label">Transitions</div>
+
+          {/* Existing transitions on this clip */}
+          {clipTransitions.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
+              {clipTransitions.map((t) => {
+                const isIncoming = t.toClipId === selectedClip.id;
+                const label = t.type === "crossfade" ? "Cross Dissolve" : t.type === "fade-from-black" ? "Fade In (Black)" : "Fade Out (Black)";
+                const dir = isIncoming ? "Head (In)" : "Tail (Out)";
+                return (
+                  <div
+                    key={t.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "4px 8px",
+                      background: "var(--bg-elevated)",
+                      borderRadius: "4px",
+                      fontSize: "11px",
+                    }}
+                  >
+                    <div>
+                      <span style={{ color: "var(--accent)", fontWeight: 500 }}>{dir}: </span>
+                      <span>{label} ({t.durationInFrames}f)</span>
+                    </div>
+                    <button
+                      className="btn btn-icon"
+                      style={{ width: "18px", height: "18px", padding: 0 }}
+                      disabled={isTrackLocked}
+                      onClick={() => onDeleteTransition(t.id)}
+                      title="Remove transition"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Quick add transition buttons */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div style={{ display: "flex", gap: "4px" }}>
+              <button
+                className="btn"
+                style={{ flex: 1, fontSize: "11px", padding: "4px 6px" }}
+                disabled={isTrackLocked || selectedClip.durationInFrames < 6}
+                onClick={() =>
+                  onAddTransition({
+                    type: "fade-from-black",
+                    durationInFrames: Math.min(15, maxTransDuration),
+                    trackId: selectedClip.trackId,
+                    toClipId: selectedClip.id,
+                  })
+                }
+              >
+                + Fade In
+              </button>
+
+              <button
+                className="btn"
+                style={{ flex: 1, fontSize: "11px", padding: "4px 6px" }}
+                disabled={isTrackLocked || selectedClip.durationInFrames < 6}
+                onClick={() =>
+                  onAddTransition({
+                    type: "fade-to-black",
+                    durationInFrames: Math.min(15, maxTransDuration),
+                    trackId: selectedClip.trackId,
+                    fromClipId: selectedClip.id,
+                  })
+                }
+              >
+                + Fade Out
+              </button>
+            </div>
+
+            {nextAdjacentClip && !hasTransitionToNext && (
+              <button
+                className="btn"
+                style={{ fontSize: "11px", padding: "4px 6px", background: "rgba(59, 130, 246, 0.15)", borderColor: "var(--accent)" }}
+                disabled={isTrackLocked}
+                onClick={() =>
+                  onAddTransition({
+                    type: "crossfade",
+                    durationInFrames: Math.min(15, maxTransDuration, getMaxTransitionDuration(nextAdjacentClip.durationInFrames)),
+                    trackId: selectedClip.trackId,
+                    fromClipId: selectedClip.id,
+                    toClipId: nextAdjacentClip.id,
+                  })
+                }
+              >
+                + Cross Dissolve to Next Clip
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Audio volume if video or audio */}
       {(selectedClip.type === "video" || selectedClip.type === "audio") && (
         <div className="inspector-section">
@@ -215,17 +550,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         </div>
       )}
-
-      {/* Speed / Playback */}
-      <div className="inspector-section">
-        <div className="section-label">Speed</div>
-        <div className="prop-row">
-          <span className="prop-label">Playback Rate</span>
-          <span style={{ fontSize: "12px", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
-            1.0x (Normal)
-          </span>
-        </div>
-      </div>
 
       {/* Clip Actions */}
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>

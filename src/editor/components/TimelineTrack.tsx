@@ -21,6 +21,9 @@ type TimelineTrackProps = {
   onCancelTrim: () => void;
   totalWidthPx: number;
   allAssets: MediaAsset[];
+  transitions?: import("../state/editorTypes").ClipTransition[];
+  selectedTransitionId?: string | null;
+  onSelectTransition?: (id: string) => void;
   onDropAsset?: (trackId: string, frame: number, asset: MediaAsset) => void;
   onDropFiles?: (trackId: string, frame: number, files: FileList) => void;
 };
@@ -43,6 +46,9 @@ export const TimelineTrack: React.FC<TimelineTrackProps> = ({
   onCancelTrim,
   totalWidthPx,
   allAssets,
+  transitions = [],
+  selectedTransitionId,
+  onSelectTransition,
   onDropAsset,
   onDropFiles,
 }) => {
@@ -164,7 +170,10 @@ export const TimelineTrack: React.FC<TimelineTrackProps> = ({
           fps={fps}
           isSelected={clip.id === selectedClipId}
           isLocked={track.locked}
+          transitions={transitions}
+          selectedTransitionId={selectedTransitionId}
           onSelect={onSelectClip}
+          onSelectTransition={onSelectTransition}
           onMoveStart={onMoveStart}
           onMove={onMoveClip}
           onCommitMove={onCommitMove}

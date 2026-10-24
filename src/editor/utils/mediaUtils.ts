@@ -1,3 +1,4 @@
+import { random } from "remotion";
 import { Clip, MediaAsset } from "../state/editorTypes";
 import { thumbnailCache } from "./thumbnailCache";
 
@@ -86,7 +87,7 @@ export function createClipFromAsset(
   targetTrackId: string,
   timelineStartFrame: number
 ): Clip {
-  const rand = Math.random().toString(36).substring(2, 7);
+  const rand = random(null).toString(36).substring(2, 7);
   const clipId = `clip-${Date.now().toString(36)}-${rand}`;
 
   return {

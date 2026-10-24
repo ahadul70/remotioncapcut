@@ -1,15 +1,27 @@
+import { random } from "remotion";
 import {
   Clip,
+  ClipTransition,
   EditorState,
+  EffectType,
   HistorySnapshot,
   MediaAsset,
   Track,
 } from "./editorTypes";
+import {
+  clampEffectValue,
+  DEFAULT_EFFECT_VALUES,
+  DEFAULT_TRANSITION_FRAMES,
+  EFFECT_METADATA,
+  getMaxTransitionDuration,
+  validateAndClampTransitions,
+} from "../utils/effectAndTransitionUtils";
 
 export type Action =
   | { type: "SET_PLAYHEAD"; frame: number }
   | { type: "SET_IS_PLAYING"; isPlaying: boolean }
   | { type: "SELECT_CLIP"; id: string | null }
+  | { type: "SELECT_TRANSITION"; id: string | null }
   | { type: "SET_ACTIVE_TOOL"; tool: EditorState["activeTool"] }
   | { type: "SET_SIDEBAR_TAB"; tab: EditorState["activeSidebarTab"] }
   | { type: "SET_ZOOM"; zoom: number }
@@ -20,6 +32,12 @@ export type Action =
   | { type: "SPLIT_CLIP_AT_PLAYHEAD"; frame?: number }
   | { type: "DELETE_CLIP"; clipId?: string }
   | { type: "UPDATE_CLIP_PROPERTIES"; clipId: string; properties: Partial<Clip> }
+  | { type: "UPDATE_CLIP_EFFECT"; clipId: string; effectType: EffectType; enabled?: boolean; value?: number }
+  | { type: "REMOVE_CLIP_EFFECT"; clipId: string; effectType: EffectType }
+  | { type: "RESET_CLIP_EFFECTS"; clipId: string }
+  | { type: "ADD_TRANSITION"; transition: Omit<ClipTransition, "id"> & { id?: string } }
+  | { type: "UPDATE_TRANSITION"; id: string; properties: Partial<Omit<ClipTransition, "id">> }
+  | { type: "DELETE_TRANSITION"; id: string }
   | { type: "TOGGLE_TRACK_MUTE"; trackId: string }
   | { type: "TOGGLE_TRACK_LOCK"; trackId: string }
   | { type: "TOGGLE_TRACK_VISIBLE"; trackId: string }
@@ -41,6 +59,8 @@ function recalculateDuration(clips: Clip[], defaultDuration: number = DEFAULT_MI
 }
 
 export function editorReducer(state: EditorState, action: Action): EditorState {
+  const currentTransitions = state.transitions || [];
+
   switch (action.type) {
     case "SET_PLAYHEAD": {
       const frame = Math.max(0, Math.min(action.frame, state.totalDurationInFrames));
@@ -52,7 +72,11 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     }
 
     case "SELECT_CLIP": {
-      return { ...state, selectedClipId: action.id };
+      return { ...state, selectedClipId: action.id, selectedTransitionId: null };
+    }
+
+    case "SELECT_TRANSITION": {
+      return { ...state, selectedTransitionId: action.id, selectedClipId: null };
     }
 
     case "SET_ACTIVE_TOOL": {
@@ -129,9 +153,13 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
           : c
       );
 
+      // Validate transitions after move
+      const updatedTransitions = validateAndClampTransitions(currentTransitions, updatedClips);
+
       return {
         ...state,
         clips: updatedClips,
+        transitions: updatedTransitions,
         totalDurationInFrames: recalculateDuration(updatedClips, state.totalDurationInFrames),
         saveStatus: "unsaved",
       };
@@ -146,29 +174,46 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       if (track?.locked) return state;
 
       const requestedStart = Math.max(0, action.newStartFrame);
-      const diff = requestedStart - clip.timelineStartFrame;
-      const newSourceStart = clip.sourceStartFrame + diff;
-      const newDuration = clip.durationInFrames - diff;
+      const deltaFrames = requestedStart - clip.timelineStartFrame;
 
-      // Minimum clip length 5 frames, sourceStart cannot be negative or exceed media
-      if (newDuration < 5 || newSourceStart < 0 || newSourceStart >= clip.sourceDurationInFrames) {
-        return state;
+      if (deltaFrames === 0) return state;
+
+      let newTimelineStart = clip.timelineStartFrame;
+      let newSourceStart = clip.sourceStartFrame;
+      let newDuration = clip.durationInFrames;
+
+      if (deltaFrames > 0) {
+        // Trimming inwards from start (shortening)
+        const trimAmount = Math.min(deltaFrames, clip.durationInFrames - 5);
+        newTimelineStart += trimAmount;
+        newSourceStart += trimAmount;
+        newDuration -= trimAmount;
+      } else {
+        // Extending outwards to the left (lengthening)
+        const availableSource = clip.sourceStartFrame;
+        const extendAmount = Math.min(-deltaFrames, availableSource);
+        newTimelineStart -= extendAmount;
+        newSourceStart -= extendAmount;
+        newDuration += extendAmount;
       }
 
       const updatedClips = state.clips.map((c) =>
         c.id === action.clipId
           ? {
               ...c,
-              timelineStartFrame: requestedStart,
+              timelineStartFrame: newTimelineStart,
               sourceStartFrame: newSourceStart,
               durationInFrames: newDuration,
             }
           : c
       );
 
+      const updatedTransitions = validateAndClampTransitions(currentTransitions, updatedClips);
+
       return {
         ...state,
         clips: updatedClips,
+        transitions: updatedTransitions,
         totalDurationInFrames: recalculateDuration(updatedClips, state.totalDurationInFrames),
         saveStatus: "unsaved",
       };
@@ -189,9 +234,12 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         c.id === action.clipId ? { ...c, durationInFrames: newDuration } : c
       );
 
+      const updatedTransitions = validateAndClampTransitions(currentTransitions, updatedClips);
+
       return {
         ...state,
         clips: updatedClips,
+        transitions: updatedTransitions,
         totalDurationInFrames: recalculateDuration(updatedClips, state.totalDurationInFrames),
         saveStatus: "unsaved",
       };
@@ -237,7 +285,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         durationInFrames: firstDuration,
       };
 
-      const secondClipId = `clip-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+      const secondClipId = `clip-${Date.now().toString(36)}-${random(null).toString(36).substring(2, 6)}`;
       const secondClip: Clip = {
         ...clip,
         id: secondClipId,
@@ -251,10 +299,24 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         .flatMap((c) => (c.id === clip.id ? [firstClip, secondClip] : [c]))
         .sort((a, b) => a.timelineStartFrame - b.timelineStartFrame);
 
+      // Re-map transitions targeting clip:
+      // Incoming transition stays on firstClip; outgoing transition moves to secondClip
+      const remappedTransitions = currentTransitions.map((t) => {
+        let fromId = t.fromClipId;
+        let toId = t.toClipId;
+        if (fromId === clip.id) fromId = secondClipId;
+        if (toId === clip.id) toId = firstClip.id;
+        return { ...t, fromClipId: fromId, toClipId: toId };
+      });
+
+      const updatedTransitions = validateAndClampTransitions(remappedTransitions, updatedClips);
+
       return {
         ...state,
         clips: updatedClips,
+        transitions: updatedTransitions,
         selectedClipId: secondClipId,
+        selectedTransitionId: null,
         saveStatus: "unsaved",
       };
     }
@@ -271,11 +333,17 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       if (track?.locked) return state;
 
       const updatedClips = state.clips.filter((c) => c.id !== targetId);
+      const remainingTransitions = currentTransitions.filter(
+        (t) => t.fromClipId !== targetId && t.toClipId !== targetId
+      );
+      const updatedTransitions = validateAndClampTransitions(remainingTransitions, updatedClips);
 
       return {
         ...state,
         clips: updatedClips,
+        transitions: updatedTransitions,
         selectedClipId: null,
+        selectedTransitionId: null,
         totalDurationInFrames: recalculateDuration(updatedClips, state.totalDurationInFrames),
         saveStatus: "unsaved",
       };
@@ -303,6 +371,187 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return {
         ...state,
         clips: updatedClips,
+        saveStatus: "unsaved",
+      };
+    }
+
+    case "UPDATE_CLIP_EFFECT": {
+      const clip = state.clips.find((c) => c.id === action.clipId);
+      if (!clip) return state;
+      const currentTrack = state.tracks.find((t) => t.id === clip.trackId);
+      if (currentTrack?.locked) return state;
+
+      const currentEffects = clip.effects ? [...clip.effects] : [];
+      const existingIndex = currentEffects.findIndex((e) => e.type === action.effectType);
+
+      const meta = EFFECT_METADATA[action.effectType];
+      const defaultValue = meta ? meta.defaultVal : DEFAULT_EFFECT_VALUES[action.effectType] ?? 0;
+
+      if (existingIndex >= 0) {
+        const existing = currentEffects[existingIndex];
+        const newEnabled = action.enabled !== undefined ? action.enabled : existing.enabled;
+        const newValue =
+          action.value !== undefined ? clampEffectValue(action.effectType, action.value) : existing.value;
+        currentEffects[existingIndex] = {
+          ...existing,
+          enabled: newEnabled,
+          value: newValue,
+        };
+      } else {
+        const newEnabled = action.enabled !== undefined ? action.enabled : true;
+        const newValue =
+          action.value !== undefined ? clampEffectValue(action.effectType, action.value) : defaultValue;
+        currentEffects.push({
+          id: `eff-${action.effectType}-${Date.now().toString(36)}`,
+          type: action.effectType,
+          enabled: newEnabled,
+          value: newValue,
+        });
+      }
+
+      const updatedClips = state.clips.map((c) =>
+        c.id === action.clipId ? { ...c, effects: currentEffects } : c
+      );
+      return {
+        ...state,
+        clips: updatedClips,
+        saveStatus: "unsaved",
+      };
+    }
+
+    case "REMOVE_CLIP_EFFECT": {
+      const clip = state.clips.find((c) => c.id === action.clipId);
+      if (!clip) return state;
+      const currentTrack = state.tracks.find((t) => t.id === clip.trackId);
+      if (currentTrack?.locked) return state;
+
+      const updatedEffects = (clip.effects || []).filter((e) => e.type !== action.effectType);
+      const updatedClips = state.clips.map((c) =>
+        c.id === action.clipId ? { ...c, effects: updatedEffects } : c
+      );
+      return {
+        ...state,
+        clips: updatedClips,
+        saveStatus: "unsaved",
+      };
+    }
+
+    case "RESET_CLIP_EFFECTS": {
+      const clip = state.clips.find((c) => c.id === action.clipId);
+      if (!clip) return state;
+      const currentTrack = state.tracks.find((t) => t.id === clip.trackId);
+      if (currentTrack?.locked) return state;
+
+      const updatedClips = state.clips.map((c) =>
+        c.id === action.clipId ? { ...c, effects: [] } : c
+      );
+      return {
+        ...state,
+        clips: updatedClips,
+        saveStatus: "unsaved",
+      };
+    }
+
+    case "ADD_TRANSITION": {
+      const track = state.tracks.find((t) => t.id === action.transition.trackId);
+      if (!track || track.locked) return state;
+
+      const clipMap = new Map<string, Clip>();
+      state.clips.forEach((c) => clipMap.set(c.id, c));
+
+      const fromClip = action.transition.fromClipId ? clipMap.get(action.transition.fromClipId) : undefined;
+      const toClip = action.transition.toClipId ? clipMap.get(action.transition.toClipId) : undefined;
+
+      if (!fromClip && !toClip) return state;
+
+      let maxDuration = 300;
+      if (fromClip) maxDuration = Math.min(maxDuration, getMaxTransitionDuration(fromClip.durationInFrames));
+      if (toClip) maxDuration = Math.min(maxDuration, getMaxTransitionDuration(toClip.durationInFrames));
+
+      const rawDuration = action.transition.durationInFrames ?? DEFAULT_TRANSITION_FRAMES;
+      const clampedDuration = Math.max(1, Math.min(Math.round(rawDuration), maxDuration));
+
+      const newTransitionId =
+        action.transition.id || `trans-${Date.now().toString(36)}-${random(null).toString(36).substring(2, 6)}`;
+      const newTransition: ClipTransition = {
+        id: newTransitionId,
+        type: action.transition.type,
+        durationInFrames: clampedDuration,
+        trackId: action.transition.trackId,
+        fromClipId: action.transition.fromClipId,
+        toClipId: action.transition.toClipId,
+      };
+
+      // Remove any existing transition between the exact same boundary
+      const filteredTransitions = currentTransitions.filter((t) => {
+        if (
+          t.fromClipId === action.transition.fromClipId &&
+          t.toClipId === action.transition.toClipId
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      return {
+        ...state,
+        transitions: [...filteredTransitions, newTransition],
+        selectedTransitionId: newTransitionId,
+        selectedClipId: null,
+        saveStatus: "unsaved",
+      };
+    }
+
+    case "UPDATE_TRANSITION": {
+      const existing = currentTransitions.find((t) => t.id === action.id);
+      if (!existing) return state;
+
+      const track = state.tracks.find((t) => t.id === existing.trackId);
+      if (track?.locked) return state;
+
+      const clipMap = new Map<string, Clip>();
+      state.clips.forEach((c) => clipMap.set(c.id, c));
+      const fromClip = existing.fromClipId ? clipMap.get(existing.fromClipId) : undefined;
+      const toClip = existing.toClipId ? clipMap.get(existing.toClipId) : undefined;
+
+      let maxDuration = 300;
+      if (fromClip) maxDuration = Math.min(maxDuration, getMaxTransitionDuration(fromClip.durationInFrames));
+      if (toClip) maxDuration = Math.min(maxDuration, getMaxTransitionDuration(toClip.durationInFrames));
+
+      let newDuration = existing.durationInFrames;
+      if (action.properties.durationInFrames !== undefined) {
+        newDuration = Math.max(1, Math.min(Math.round(action.properties.durationInFrames), maxDuration));
+      }
+
+      const updatedTransitions = currentTransitions.map((t) =>
+        t.id === action.id
+          ? {
+              ...t,
+              ...action.properties,
+              durationInFrames: newDuration,
+            }
+          : t
+      );
+
+      return {
+        ...state,
+        transitions: updatedTransitions,
+        saveStatus: "unsaved",
+      };
+    }
+
+    case "DELETE_TRANSITION": {
+      const existing = currentTransitions.find((t) => t.id === action.id);
+      if (!existing) return state;
+
+      const track = state.tracks.find((t) => t.id === existing.trackId);
+      if (track?.locked) return state;
+
+      return {
+        ...state,
+        transitions: currentTransitions.filter((t) => t.id !== action.id),
+        selectedTransitionId:
+          state.selectedTransitionId === action.id ? null : state.selectedTransitionId,
         saveStatus: "unsaved",
       };
     }
@@ -335,7 +584,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const prefix = isVideo ? "track-v" : "track-a";
       let trackId = `${prefix}${nextNum}`;
       while (state.tracks.some((t) => t.id === trackId)) {
-        trackId = `${prefix}${Math.random().toString(36).substring(2, 6)}`;
+        trackId = `${prefix}${random(null).toString(36).substring(2, 6)}`;
       }
 
       const name = isVideo ? `V${nextNum} Video` : `A${nextNum} Audio`;
@@ -383,14 +632,21 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
 
       const updatedTracks = state.tracks.filter((t) => t.id !== action.trackId);
       const updatedClips = state.clips.filter((c) => c.trackId !== action.trackId);
+      const remainingTransitions = currentTransitions.filter((t) => t.trackId !== action.trackId);
+      const updatedTransitions = validateAndClampTransitions(remainingTransitions, updatedClips);
 
       return {
         ...state,
         tracks: updatedTracks,
         clips: updatedClips,
+        transitions: updatedTransitions,
         selectedClipId:
           state.selectedClipId && updatedClips.some((c) => c.id === state.selectedClipId)
             ? state.selectedClipId
+            : null,
+        selectedTransitionId:
+          state.selectedTransitionId && updatedTransitions.some((t) => t.id === state.selectedTransitionId)
+            ? state.selectedTransitionId
             : null,
         totalDurationInFrames: recalculateDuration(updatedClips, state.totalDurationInFrames),
         saveStatus: "unsaved",
@@ -406,7 +662,9 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         ...state,
         clips: action.snapshot.clips,
         tracks: action.snapshot.tracks,
+        transitions: action.snapshot.transitions || [],
         selectedClipId: action.snapshot.selectedClipId,
+        selectedTransitionId: action.snapshot.selectedTransitionId || null,
         totalDurationInFrames: action.snapshot.totalDurationInFrames,
         saveStatus: "unsaved",
       };

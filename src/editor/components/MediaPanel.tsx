@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
-import { MediaAsset, SidebarTab } from "../state/editorTypes";
+import { random } from "remotion";
+import { Clip, EffectType, MediaAsset, SidebarTab, TransitionType } from "../state/editorTypes";
 import { extractMediaMetadata, validateMediaFile } from "../utils/mediaUtils";
 
 type MediaPanelProps = {
@@ -10,6 +11,9 @@ type MediaPanelProps = {
   onImportAssets: (assets: MediaAsset[]) => void;
   onAddAssetToTimeline: (asset: MediaAsset) => void;
   onDragAssetStart?: (asset: MediaAsset) => void;
+  selectedClip?: Clip | null;
+  onApplyTransition?: (type: TransitionType) => void;
+  onApplyEffectPreset?: (preset: { type: EffectType; value: number }[]) => void;
 };
 
 export const MediaPanel: React.FC<MediaPanelProps> = ({
@@ -20,6 +24,9 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
   onImportAssets,
   onAddAssetToTimeline,
   onDragAssetStart,
+  selectedClip,
+  onApplyTransition,
+  onApplyEffectPreset,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +54,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
       try {
         const metadata = await extractMediaMetadata(file, fps);
         const objectUrl = URL.createObjectURL(file);
-        const rand = Math.random().toString(36).substring(2, 6);
+        const rand = random(null).toString(36).substring(2, 6);
         const assetId = `asset-${Date.now().toString(36)}-${rand}`;
 
         newAssets.push({
@@ -538,21 +545,41 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
             <div className="pane-header">
               <span className="pane-title">Transitions</span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-              {["Cross Fade", "Wipe Left", "Slide Up", "Zoom In"].map((t) => (
+            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px" }}>
+              {selectedClip
+                ? `Click a transition to apply to "${selectedClip.name}"`
+                : "Select a clip on the timeline to apply transitions"}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {[
+                { type: "crossfade" as const, title: "Cross Dissolve", desc: "Smooth dissolve between clips" },
+                { type: "fade-from-black" as const, title: "Fade from Black", desc: "Intro fade from pure black" },
+                { type: "fade-to-black" as const, title: "Fade to Black", desc: "Outro fade to pure black" },
+              ].map((t) => (
                 <div
-                  key={t}
+                  key={t.type}
                   style={{
-                    padding: "16px 8px",
+                    padding: "10px 12px",
                     background: "var(--bg-elevated)",
                     borderRadius: "var(--radius-md)",
                     border: "1px solid var(--border-color)",
-                    textAlign: "center",
-                    fontSize: "11px",
-                    color: "var(--text-secondary)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
-                  {t}
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>{t.title}</div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{t.desc}</div>
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    style={{ fontSize: "10px", padding: "4px 8px" }}
+                    disabled={!selectedClip}
+                    onClick={() => onApplyTransition && onApplyTransition(t.type)}
+                  >
+                    Apply
+                  </button>
                 </div>
               ))}
             </div>
@@ -562,24 +589,78 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
         {activeTab === "effects" && (
           <div>
             <div className="pane-header">
-              <span className="pane-title">Video Effects</span>
+              <span className="pane-title">Video Effect Presets</span>
+            </div>
+            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px" }}>
+              {selectedClip
+                ? `Click to apply visual effect to "${selectedClip.name}"`
+                : "Select a clip on the timeline to apply visual effects"}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-              {["Color Balance", "Gaussian Blur", "Vignette", "Grain"].map((e) => (
-                <div
-                  key={e}
+              {[
+                {
+                  title: "Vibrant Pop",
+                  effects: [
+                    { type: "saturation" as const, value: 140 },
+                    { type: "contrast" as const, value: 115 },
+                  ],
+                },
+                {
+                  title: "Cinematic Noir",
+                  effects: [
+                    { type: "grayscale" as const, value: 100 },
+                    { type: "contrast" as const, value: 125 },
+                  ],
+                },
+                {
+                  title: "Moody Vignette",
+                  effects: [
+                    { type: "vignette" as const, value: 60 },
+                    { type: "contrast" as const, value: 110 },
+                  ],
+                },
+                {
+                  title: "Soft Focus",
+                  effects: [
+                    { type: "blur" as const, value: 3 },
+                    { type: "brightness" as const, value: 105 },
+                  ],
+                },
+                {
+                  title: "High Contrast",
+                  effects: [
+                    { type: "contrast" as const, value: 150 },
+                    { type: "brightness" as const, value: 100 },
+                  ],
+                },
+                {
+                  title: "Summer Warmth",
+                  effects: [
+                    { type: "brightness" as const, value: 110 },
+                    { type: "saturation" as const, value: 125 },
+                    { type: "vignette" as const, value: 25 },
+                  ],
+                },
+              ].map((preset) => (
+                <button
+                  key={preset.title}
+                  className="btn"
+                  disabled={!selectedClip}
+                  onClick={() => onApplyEffectPreset && onApplyEffectPreset(preset.effects)}
                   style={{
-                    padding: "16px 8px",
-                    background: "var(--bg-elevated)",
-                    borderRadius: "var(--radius-md)",
-                    border: "1px solid var(--border-color)",
+                    padding: "12px 8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "4px",
                     textAlign: "center",
-                    fontSize: "11px",
-                    color: "var(--text-secondary)",
+                    height: "auto",
                   }}
                 >
-                  {e}
-                </div>
+                  <span style={{ fontSize: "12px", fontWeight: 600 }}>{preset.title}</span>
+                  <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>Apply Preset</span>
+                </button>
               ))}
             </div>
           </div>

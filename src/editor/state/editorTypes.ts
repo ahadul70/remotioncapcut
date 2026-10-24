@@ -1,5 +1,31 @@
 export type ClipType = "video" | "audio" | "image" | "text";
 
+export type EffectType =
+  | "brightness"
+  | "contrast"
+  | "saturation"
+  | "grayscale"
+  | "blur"
+  | "vignette";
+
+export type ClipEffect = {
+  id: string;
+  type: EffectType;
+  enabled: boolean;
+  value: number; // e.g. 0-200% for brightness/contrast/saturation, 0-100% for grayscale/vignette, 0-20px for blur
+};
+
+export type TransitionType = "crossfade" | "fade-to-black" | "fade-from-black";
+
+export type ClipTransition = {
+  id: string;
+  type: TransitionType;
+  durationInFrames: number; // Positive integer frames
+  trackId: string;
+  fromClipId?: string; // Preceding/outgoing clip ID
+  toClipId?: string;   // Following/incoming clip ID
+};
+
 export type Clip = {
   id: string;
   assetId: string;
@@ -24,6 +50,19 @@ export type Clip = {
   // Audio properties
   volume?: number;    // 0.0 to 1.0
   muted?: boolean;
+
+  // Visual effects
+  effects?: ClipEffect[];
+
+  // Text clip properties (Step 6)
+  text?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: string;
+  fontStyle?: string;
+  color?: string;
+  backgroundColor?: string;
+  textAlign?: "left" | "center" | "right";
 
   // Future playback rate
   playbackRate?: number;
@@ -73,11 +112,13 @@ export type EditorState = {
   currentFrame: number;
   isPlaying: boolean;
   selectedClipId: string | null;
+  selectedTransitionId?: string | null;
   activeTool: EditorTool;
   snappingEnabled: boolean;
   zoom: number; // pixels per frame (e.g. 2 to 20)
   tracks: Track[];
   clips: Clip[];
+  transitions?: ClipTransition[];
   assets: MediaAsset[];
   activeSidebarTab: SidebarTab;
   isExportDialogOpen: boolean;
@@ -87,6 +128,8 @@ export type EditorState = {
 export type HistorySnapshot = {
   clips: Clip[];
   tracks: Track[];
+  transitions?: ClipTransition[];
   selectedClipId: string | null;
+  selectedTransitionId?: string | null;
   totalDurationInFrames: number;
 };

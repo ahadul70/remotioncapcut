@@ -34,7 +34,10 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
   const currentFrame = useCurrentPlayerFrame(playerRef, state.currentFrame);
 
   // Memoize inputProps so Player never re-evaluates unnecessarily on every frame
-  const inputProps = useMemo(() => ({ clips: state.clips, tracks: state.tracks }), [state.clips, state.tracks]);
+  const inputProps = useMemo(
+    () => ({ clips: state.clips, tracks: state.tracks, transitions: state.transitions }),
+    [state.clips, state.tracks, state.transitions]
+  );
 
   // Sync internal player events to editor state
   useEffect(() => {

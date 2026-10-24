@@ -1,9 +1,18 @@
+/* eslint-disable @remotion/non-pure-animation */
 import React, { useCallback, useEffect, useReducer, useRef } from "react";
 import { PlayerRef } from "@remotion/player";
-import { staticFile } from "remotion";
+import { random, staticFile } from "remotion";
 import { Input, ALL_FORMATS, UrlSource } from "mediabunny";
 
-import { Clip, EditorState, HistorySnapshot, MediaAsset } from "./state/editorTypes";
+import {
+  Clip,
+  ClipTransition,
+  EditorState,
+  EffectType,
+  HistorySnapshot,
+  MediaAsset,
+  TransitionType,
+} from "./state/editorTypes";
 import { editorReducer } from "./state/editorReducer";
 import { HistoryManager } from "./state/history";
 
@@ -26,6 +35,7 @@ const INITIAL_STATE: EditorState = {
   currentFrame: 0,
   isPlaying: false,
   selectedClipId: "clip-test-1",
+  selectedTransitionId: null,
   activeTool: "select",
   snappingEnabled: true,
   zoom: 0.8, // 0.8 px per frame gives ~1830px timeline, comfortable for desktop scrolling/fit
@@ -54,6 +64,7 @@ const INITIAL_STATE: EditorState = {
       muted: false,
     },
   ],
+  transitions: [],
   assets: [
     {
       id: "asset-test-mp4",
@@ -80,9 +91,11 @@ export const EditorApp: React.FC = () => {
   const captureSnapshot = useCallback((): HistorySnapshot => ({
     clips: JSON.parse(JSON.stringify(state.clips)),
     tracks: JSON.parse(JSON.stringify(state.tracks)),
+    transitions: JSON.parse(JSON.stringify(state.transitions || [])),
     selectedClipId: state.selectedClipId,
+    selectedTransitionId: state.selectedTransitionId,
     totalDurationInFrames: state.totalDurationInFrames,
-  }), [state.clips, state.tracks, state.selectedClipId, state.totalDurationInFrames]);
+  }), [state.clips, state.tracks, state.transitions, state.selectedClipId, state.selectedTransitionId, state.totalDurationInFrames]);
 
   // Capture snapshot for undo stack (discrete actions)
   const recordSnapshot = useCallback(() => {
@@ -172,28 +185,18 @@ export const EditorApp: React.FC = () => {
 
   // Undo / Redo handlers
   const handleUndo = useCallback(() => {
-    const prev = historyRef.current.undo({
-      clips: state.clips,
-      tracks: state.tracks,
-      selectedClipId: state.selectedClipId,
-      totalDurationInFrames: state.totalDurationInFrames,
-    });
+    const prev = historyRef.current.undo(captureSnapshot());
     if (prev) {
       dispatch({ type: "RESTORE_SNAPSHOT", snapshot: prev });
     }
-  }, [state.clips, state.tracks, state.selectedClipId, state.totalDurationInFrames]);
+  }, [captureSnapshot]);
 
   const handleRedo = useCallback(() => {
-    const next = historyRef.current.redo({
-      clips: state.clips,
-      tracks: state.tracks,
-      selectedClipId: state.selectedClipId,
-      totalDurationInFrames: state.totalDurationInFrames,
-    });
+    const next = historyRef.current.redo(captureSnapshot());
     if (next) {
       dispatch({ type: "RESTORE_SNAPSHOT", snapshot: next });
     }
-  }, [state.clips, state.tracks, state.selectedClipId, state.totalDurationInFrames]);
+  }, [captureSnapshot]);
 
   // Split operation with history
   const handleSplit = useCallback(() => {
@@ -204,10 +207,15 @@ export const EditorApp: React.FC = () => {
 
   // Delete operation with history
   const handleDelete = useCallback(() => {
+    if (state.selectedTransitionId) {
+      recordSnapshot();
+      dispatch({ type: "DELETE_TRANSITION", id: state.selectedTransitionId });
+      return;
+    }
     if (!state.selectedClipId) return;
     recordSnapshot();
     dispatch({ type: "DELETE_CLIP" });
-  }, [recordSnapshot, state.selectedClipId]);
+  }, [recordSnapshot, state.selectedClipId, state.selectedTransitionId]);
 
   // Property update with history
   const handleUpdateProperties = useCallback(
@@ -221,6 +229,79 @@ export const EditorApp: React.FC = () => {
       });
     },
     [recordSnapshot, state.selectedClipId]
+  );
+
+  // Effect handlers with history
+  const handleUpdateEffect = useCallback(
+    (effectType: EffectType, enabled?: boolean, value?: number) => {
+      if (!state.selectedClipId) return;
+      recordSnapshot();
+      dispatch({
+        type: "UPDATE_CLIP_EFFECT",
+        clipId: state.selectedClipId,
+        effectType,
+        enabled,
+        value,
+      });
+    },
+    [recordSnapshot, state.selectedClipId]
+  );
+
+  const handleRemoveEffect = useCallback(
+    (effectType: EffectType) => {
+      if (!state.selectedClipId) return;
+      recordSnapshot();
+      dispatch({
+        type: "REMOVE_CLIP_EFFECT",
+        clipId: state.selectedClipId,
+        effectType,
+      });
+    },
+    [recordSnapshot, state.selectedClipId]
+  );
+
+  const handleResetEffects = useCallback(() => {
+    if (!state.selectedClipId) return;
+    recordSnapshot();
+    dispatch({
+      type: "RESET_CLIP_EFFECTS",
+      clipId: state.selectedClipId,
+    });
+  }, [recordSnapshot, state.selectedClipId]);
+
+  // Transition handlers with history
+  const handleAddTransition = useCallback(
+    (newTrans: Omit<ClipTransition, "id">) => {
+      recordSnapshot();
+      dispatch({
+        type: "ADD_TRANSITION",
+        transition: newTrans,
+      });
+    },
+    [recordSnapshot]
+  );
+
+  const handleUpdateTransition = useCallback(
+    (id: string, properties: Partial<Omit<ClipTransition, "id">>) => {
+      recordSnapshot();
+      dispatch({
+        type: "UPDATE_TRANSITION",
+        id,
+        properties,
+      });
+    },
+    [recordSnapshot]
+  );
+
+  const handleDeleteTransition = useCallback(
+    (id: string) => {
+      recordSnapshot();
+      dispatch({
+        type: "DELETE_TRANSITION",
+        id,
+      });
+    },
+    [recordSnapshot]
   );
 
   // Track management handlers with undo/redo
@@ -310,7 +391,9 @@ export const EditorApp: React.FC = () => {
         snapshot: {
           clips: [...state.clips, newClip],
           tracks: state.tracks,
+          transitions: state.transitions,
           selectedClipId: newClip.id,
+          selectedTransitionId: null,
           totalDurationInFrames: Math.max(
             state.totalDurationInFrames,
             startFrame + asset.durationInFrames + 30
@@ -321,7 +404,7 @@ export const EditorApp: React.FC = () => {
       // Jump playhead to the new clip start so user immediately sees preview
       handleSeek(startFrame);
     },
-    [recordSnapshot, state.tracks, playerRef, state.currentFrame, state.clips, state.totalDurationInFrames, handleSeek]
+    [recordSnapshot, state.tracks, state.clips, state.transitions, state.totalDurationInFrames, state.currentFrame, handleSeek]
   );
 
   // Bulk import assets into state and auto-place on timeline
@@ -355,7 +438,7 @@ export const EditorApp: React.FC = () => {
         try {
           const metadata = await extractMediaMetadata(file, state.fps);
           const objectUrl = URL.createObjectURL(file);
-          const rand = Math.random().toString(36).substring(2, 6);
+          const rand = random(null).toString(36).substring(2, 6);
           const assetId = `asset-${Date.now().toString(36)}-${rand}`;
           const asset: MediaAsset = {
             id: assetId,
@@ -393,7 +476,9 @@ export const EditorApp: React.FC = () => {
           snapshot: {
             clips: [...state.clips, ...newClips],
             tracks: state.tracks,
+            transitions: state.transitions,
             selectedClipId: newClips[0]?.id || state.selectedClipId,
+            selectedTransitionId: null,
             totalDurationInFrames: Math.max(
               state.totalDurationInFrames,
               currentDropFrame + 30
@@ -405,7 +490,7 @@ export const EditorApp: React.FC = () => {
         }
       }
     },
-    [state.fps, state.tracks, state.clips, state.selectedClipId, state.totalDurationInFrames, recordSnapshot, handleSeek]
+    [state.fps, state.tracks, state.clips, state.transitions, state.selectedClipId, state.totalDurationInFrames, recordSnapshot, handleSeek]
   );
 
   // Window-level drag & drop for dropping files anywhere in the editor window
@@ -463,7 +548,7 @@ export const EditorApp: React.FC = () => {
         }
       }
 
-      // Delete / Backspace: Delete selected clip
+      // Delete / Backspace: Delete selected clip or transition
       if (e.code === "Delete" || e.code === "Backspace") {
         e.preventDefault();
         handleDelete();
@@ -521,9 +606,11 @@ export const EditorApp: React.FC = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleDelete, handleSplit, handleSeek, handleUndo, handleRedo, state.currentFrame, state.totalDurationInFrames, state.zoom]);
+  }, [handleDelete, handleSplit, handleSeek, handleUndo, handleRedo, state.selectedClipId, state.selectedTransitionId, state.currentFrame, state.totalDurationInFrames, state.zoom]);
 
   const selectedClip = state.clips.find((c) => c.id === state.selectedClipId) || null;
+  const currentTransitions = state.transitions || [];
+  const selectedTransition = currentTransitions.find((t) => t.id === state.selectedTransitionId) || null;
 
   return (
     <div className="editor-layout">
@@ -551,6 +638,29 @@ export const EditorApp: React.FC = () => {
           fps={state.fps}
           onImportAssets={handleImportAssets}
           onAddAssetToTimeline={handleAddAssetToTimeline}
+          selectedClip={selectedClip}
+          onApplyTransition={(type: TransitionType) => {
+            if (!selectedClip) return;
+            handleAddTransition({
+              type,
+              durationInFrames: 15,
+              trackId: selectedClip.trackId,
+              toClipId: selectedClip.id,
+            });
+          }}
+          onApplyEffectPreset={(preset) => {
+            if (!selectedClip) return;
+            recordSnapshot();
+            for (const eff of preset) {
+              dispatch({
+                type: "UPDATE_CLIP_EFFECT",
+                clipId: selectedClip.id,
+                effectType: eff.type,
+                enabled: true,
+                value: eff.value,
+              });
+            }
+          }}
         />
 
         <PreviewPanel
@@ -562,9 +672,18 @@ export const EditorApp: React.FC = () => {
 
         <PropertiesPanel
           selectedClip={selectedClip}
+          selectedTransition={selectedTransition}
+          allClips={state.clips}
+          transitions={currentTransitions}
           tracks={state.tracks}
           fps={state.fps}
           onUpdateProperties={handleUpdateProperties}
+          onUpdateEffect={handleUpdateEffect}
+          onRemoveEffect={handleRemoveEffect}
+          onResetEffects={handleResetEffects}
+          onAddTransition={handleAddTransition}
+          onUpdateTransition={handleUpdateTransition}
+          onDeleteTransition={handleDeleteTransition}
           onDeleteClip={handleDelete}
           onSplitClip={handleSplit}
           currentFrame={state.currentFrame}
@@ -577,6 +696,7 @@ export const EditorApp: React.FC = () => {
         playerRef={playerRef}
         onSeek={handleSeek}
         onSelectClip={(id) => dispatch({ type: "SELECT_CLIP", id })}
+        onSelectTransition={(id) => dispatch({ type: "SELECT_TRANSITION", id })}
         onMoveStart={handleMoveStart}
         onMoveClip={(clipId, newStartFrame, targetTrackId) =>
           dispatch({ type: "MOVE_CLIP", clipId, newStartFrame, targetTrackId })

@@ -30,6 +30,7 @@ type TimelineProps = {
   onDeleteTrack?: (trackId: string) => void;
   onDropAsset?: (trackId: string, frame: number, asset: MediaAsset) => void;
   onDropFiles?: (trackId: string, frame: number, files: FileList) => void;
+  onSelectTransition?: (id: string) => void;
 };
 
 export const Timeline: React.FC<TimelineProps> = ({
@@ -37,6 +38,7 @@ export const Timeline: React.FC<TimelineProps> = ({
   playerRef,
   onSeek,
   onSelectClip,
+  onSelectTransition,
   onMoveStart,
   onMoveClip,
   onCommitMove,
@@ -361,10 +363,13 @@ export const Timeline: React.FC<TimelineProps> = ({
               key={track.id}
               track={track}
               clips={state.clips}
+              transitions={state.transitions}
+              selectedTransitionId={state.selectedTransitionId}
               zoom={state.zoom}
               fps={state.fps}
               selectedClipId={state.selectedClipId}
               onSelectClip={onSelectClip}
+              onSelectTransition={onSelectTransition}
               onMoveStart={onMoveStart}
               onMoveClip={onMoveClip}
               onCommitMove={onCommitMove}
