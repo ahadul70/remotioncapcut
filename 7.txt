@@ -1,0 +1,93 @@
+# Step 7: Functional Transitions and Video Effects
+
+Project: Existing React + TypeScript + Remotion editor at `E:\remotion`.
+
+## Objective
+Implement a small, reliable foundation for real clip transitions and adjustable video effects. Both must work in the preview and final Remotion composition.
+
+## 1. Inspect before coding
+- Check Git status, current HEAD, recent commits, package.json, and current tests.
+- Inspect the existing clip and track models, editing reducer, timeline, properties inspector, Composition.tsx, and preview/export paths.
+- Verify which earlier milestones are actually implemented.
+- Preserve working media import, multitrack editing, text clips, frame-accurate timing, snapping, trimming, splitting, and undo/redo.
+- Create a Git checkpoint before substantial changes if the working tree is clean. Do not discard uncommitted changes.
+
+## 2. Establish a reusable effect model
+Create or extend a typed effect model in the existing centralized editing state.
+
+Each effect should have:
+- Stable ID.
+- Effect type.
+- Enabled state.
+- Typed parameters.
+- A defined target clip or supported scope.
+
+Effects must be real state, not temporary inspector-only values. Changes must integrate with undo/redo.
+
+Implement these initial effects:
+- Brightness.
+- Contrast.
+- Saturation.
+- Grayscale.
+- Blur.
+- Vignette, only if it can be implemented reliably with the existing rendering approach.
+
+Use reasonable parameter limits and defaults. Avoid adding a large effects library unless necessary.
+
+## 3. Render effects correctly
+- Apply effects to the intended video clip using Remotion-compatible rendering.
+- Preview and final rendering must use the same effect definitions and parameter values.
+- Use deterministic rendering and avoid browser-only effects that disappear in CLI rendering.
+- Keep the editor interface, selection outlines, and inspector out of the final video.
+- Ensure effects do not alter source files.
+- Avoid unnecessary per-frame allocations and expensive processing.
+- Test effects on imported video and the existing TEST.mp4 where supported.
+
+## 4. Implement a small transition system
+Start with:
+- Cross dissolve.
+- Fade to black.
+- Fade from black.
+
+Add further transitions only if the existing clip and track model supports them without fragile special cases.
+
+Requirements:
+- Transitions must be represented in editable state.
+- Allow users to add, select, adjust duration, and remove a transition.
+- Use integer frames for transition timing.
+- Display transition regions clearly on the timeline.
+- Handle clips that are too short for the requested transition.
+- Define overlap and clip-boundary behavior explicitly.
+- Prevent invalid timing and accidental negative durations.
+- Preview and render must use identical transition timing.
+
+Do not fake transitions with inspector animations or CSS that is not reflected in the Remotion composition.
+
+## 5. Timeline and inspector integration
+- Add a compact effects section to the existing inspector.
+- Provide functional parameter controls and enable/disable toggles.
+- Provide a practical way to add and remove transitions.
+- Ensure controls update centralized editing state and participate in undo/redo.
+- Preserve existing selection and timeline interactions.
+
+## 6. Testing
+Add tests for:
+- Effect parameter validation and state updates.
+- Undo/redo of effect changes.
+- Transition duration and frame-boundary calculations.
+- Short clips and invalid transition durations.
+- Transition timing at clip boundaries.
+- Preview/render use of the same effect and transition data.
+
+Run lint, type-check, automated tests, Vite build, and Remotion build commands supported by the actual package scripts.
+
+Perform browser and rendered-output tests when available. Report them separately.
+
+## Scope exclusions
+Do not implement AI effects, third-party effect packs, keyframe animation, advanced motion tracking, or a complete CapCut effects catalog. Do not add AI APIs or backend services.
+
+## Final report
+Report files changed, effects and transitions actually implemented, test and build results, browser verification, rendered-output verification, performance concerns, and remaining limitations.
+
+## Acceptance criteria
+I can apply an effect to a clip, adjust its parameters, and see the same result in preview and rendered output. I can add and adjust a transition between clips and verify its timing in the final render. Existing editing functionality must remain intact.
