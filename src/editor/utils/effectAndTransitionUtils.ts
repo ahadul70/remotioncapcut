@@ -7,6 +7,11 @@ export const DEFAULT_EFFECT_VALUES: Record<EffectType, number> = {
   grayscale: 0,    // 0%
   blur: 0,         // 0px
   vignette: 0,     // 0%
+  "paper-cutout": 70,
+  "drop-settle": 60,
+  "paper-slide": 50,
+  "text-highlight": 80,
+  "stagger-words": 3,
 };
 
 export const EFFECT_METADATA: Record<
@@ -19,6 +24,11 @@ export const EFFECT_METADATA: Record<
   grayscale: { label: "Grayscale", min: 0, max: 100, unit: "%", step: 1, defaultVal: 0 },
   blur: { label: "Blur", min: 0, max: 20, unit: "px", step: 0.5, defaultVal: 0 },
   vignette: { label: "Vignette", min: 0, max: 100, unit: "%", step: 1, defaultVal: 0 },
+  "paper-cutout": { label: "Paper Cutout", min: 0, max: 100, unit: "%", step: 1, defaultVal: 70 },
+  "drop-settle": { label: "Drop & Settle", min: 0, max: 100, unit: "%", step: 1, defaultVal: 60 },
+  "paper-slide": { label: "Paper Slide", min: 0, max: 100, unit: "%", step: 1, defaultVal: 50 },
+  "text-highlight": { label: "Text Highlight", min: 0, max: 100, unit: "%", step: 1, defaultVal: 80 },
+  "stagger-words": { label: "Stagger Words", min: 1, max: 15, unit: "f", step: 1, defaultVal: 3 },
 };
 
 export function clampEffectValue(type: EffectType, val: number): number {

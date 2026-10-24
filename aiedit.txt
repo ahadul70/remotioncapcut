@@ -1,0 +1,67 @@
+# Milestone: First AI Editing Prototype
+
+Project: `E:\remotion`
+
+## Objective
+Inspect the existing Remotion video editor and prepare the smallest safe implementation that allows AI-generated editing instructions to modify the real timeline and preview.
+
+**Do not rebuild the project or replace existing functionality.**
+
+## Phase 1: Inspect first
+Before changing any files:
+
+1. Inspect the project structure, `package.json`, and available scripts.
+2. Inspect the centralized editing state, clip data model, timeline operations, and undo/redo implementation.
+3. Inspect the Remotion Player and final video composition.
+4. Inspect the current effects implementation, if any.
+5. Check Git status and recent commits. Do not overwrite uncommitted work.
+6. Identify the existing APIs that can move, trim, split, delete, or apply effects to clips.
+
+Report what already exists, what is missing, and the safest implementation approach.
+
+## Phase 2: Implement a minimal AI editing prototype
+
+After inspection, implement only what is needed for this first experiment:
+
+1. Create a typed, structured editing-plan format that supports operations already available in the editor.
+2. Add a small AI-editing panel where the user can enter an editing instruction.
+3. For the first version, use a deterministic mock AI response. Do not add API keys, paid APIs, backend services, or external AI dependencies.
+4. Validate every proposed operation against the actual clip IDs, supported operations, frame boundaries, and effect parameters.
+5. Display a reviewable list of proposed changes before applying them.
+6. Apply approved operations through the existing centralized editing state, not through direct DOM manipulation or a separate fake timeline.
+7. Integrate changes with undo/redo. If the existing history system cannot safely support a batch operation, report the limitation and implement the smallest compatible solution.
+8. Ensure the preview and final Remotion composition use the same editing data.
+9. Do not add decorative controls or pretend that unsupported AI features work.
+
+For the first test, support one small, real edit such as shortening a clip or applying an existing supported visual effect. If the effects engine does not exist yet, do not invent a fake effect. Report the missing dependency and implement only the safe parts of the prototype.
+
+## Phase 3: Test
+
+Run the relevant existing tests, lint, type-check, and production build using the project's actual scripts.
+
+Add tests for:
+- Valid editing plans.
+- Invalid clip IDs and unsupported operations.
+- Applying an approved edit.
+- Undoing and redoing the edit.
+- Preview and render consistency where testable.
+
+Do not claim browser or rendering success unless you actually verify it.
+
+## Constraints
+- Preserve `public/TEST.mp4` and existing playback/duration behavior.
+- Preserve the standalone editor shell and keep editor UI out of exported video.
+- Use integer frame positions and stable clip IDs.
+- Avoid unnecessary dependencies and broad refactors.
+- Do not implement full autonomous editing, footage analysis, captions, B-roll selection, or real AI API integration in this milestone.
+
+## Final report
+List:
+1. Files inspected and changed.
+2. What actually works.
+3. Tests run and their results.
+4. Any remaining limitations.
+5. Exact steps to test the prototype in the browser.
+6. Recommended next milestone.
+
+Stop after this scoped prototype. Do not begin another milestone automatically.

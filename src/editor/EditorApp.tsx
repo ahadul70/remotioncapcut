@@ -8,7 +8,9 @@ import {
   Clip,
   ClipTransition,
   EditorState,
+  EditorialGraphicData,
   EffectType,
+  GraphicType,
   HistorySnapshot,
   MediaAsset,
   TransitionType,
@@ -233,7 +235,7 @@ export const EditorApp: React.FC = () => {
 
   // Effect handlers with history
   const handleUpdateEffect = useCallback(
-    (effectType: EffectType, enabled?: boolean, value?: number) => {
+    (effectType: EffectType, enabled?: boolean, value?: number, params?: Record<string, unknown>) => {
       if (!state.selectedClipId) return;
       recordSnapshot();
       dispatch({
@@ -242,9 +244,48 @@ export const EditorApp: React.FC = () => {
         effectType,
         enabled,
         value,
+        params,
       });
     },
     [recordSnapshot, state.selectedClipId]
+  );
+
+  const handleUpdateEffectParams = useCallback(
+    (effectType: EffectType, params: Record<string, unknown>) => {
+      if (!state.selectedClipId) return;
+      recordSnapshot();
+      dispatch({
+        type: "UPDATE_CLIP_EFFECT_PARAMS",
+        clipId: state.selectedClipId,
+        effectType,
+        params,
+      });
+    },
+    [recordSnapshot, state.selectedClipId]
+  );
+
+  const handleUpdateGraphicData = useCallback(
+    (graphicData: Partial<EditorialGraphicData>) => {
+      if (!state.selectedClipId) return;
+      recordSnapshot();
+      dispatch({
+        type: "UPDATE_GRAPHIC_DATA",
+        clipId: state.selectedClipId,
+        graphicData,
+      });
+    },
+    [recordSnapshot, state.selectedClipId]
+  );
+
+  const handleAddGraphicClip = useCallback(
+    (graphicType: GraphicType) => {
+      recordSnapshot();
+      dispatch({
+        type: "ADD_GRAPHIC_CLIP",
+        graphicType,
+      });
+    },
+    [recordSnapshot]
   );
 
   const handleRemoveEffect = useCallback(
@@ -638,6 +679,7 @@ export const EditorApp: React.FC = () => {
           fps={state.fps}
           onImportAssets={handleImportAssets}
           onAddAssetToTimeline={handleAddAssetToTimeline}
+          onAddGraphicClip={handleAddGraphicClip}
           selectedClip={selectedClip}
           onApplyTransition={(type: TransitionType) => {
             if (!selectedClip) return;
@@ -658,6 +700,7 @@ export const EditorApp: React.FC = () => {
                 effectType: eff.type,
                 enabled: true,
                 value: eff.value,
+                params: eff.params,
               });
             }
           }}
@@ -679,6 +722,8 @@ export const EditorApp: React.FC = () => {
           fps={state.fps}
           onUpdateProperties={handleUpdateProperties}
           onUpdateEffect={handleUpdateEffect}
+          onUpdateEffectParams={handleUpdateEffectParams}
+          onUpdateGraphicData={handleUpdateGraphicData}
           onRemoveEffect={handleRemoveEffect}
           onResetEffects={handleResetEffects}
           onAddTransition={handleAddTransition}

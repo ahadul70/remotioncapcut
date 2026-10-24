@@ -13,6 +13,9 @@ import {
 import { Input, ALL_FORMATS, UrlSource } from "mediabunny";
 import { Clip, Track, ClipTransition } from "./editor/state/editorTypes";
 import { buildCssFilter, getVignetteIntensity } from "./editor/utils/effectAndTransitionUtils";
+import { PaperCutoutWrapper } from "./editor/components/editorial/PaperCutoutWrapper";
+import { EditorialTypography } from "./editor/components/editorial/EditorialTypography";
+import { DataGraphic } from "./editor/components/editorial/DataGraphic";
 
 export type VideoCompositionProps = {
   clips?: Clip[];
@@ -93,7 +96,8 @@ export const calculateMetadata: CalculateMetadataFunction<VideoCompositionProps>
 };
 
 /**
- * Individual visual clip renderer with transitions and video effects applied deterministically.
+ * Visual clip renderer: combines editorial graphics, typography, paper cutout wrappers,
+ * CSS filters, and deterministic editorial transitions.
  */
 const VisualClipItem: React.FC<{
   clip: Clip;
@@ -107,6 +111,9 @@ const VisualClipItem: React.FC<{
 
   let transitionOpacity = 1;
   let blackOverlayOpacity = 0;
+  let clipPath: string | undefined = undefined;
+  let transTranslateX = 0;
+  let transScale = 1;
 
   // Incoming transition (starts at frame 0)
   if (transIn && clip.durationInFrames > 1) {
@@ -117,6 +124,14 @@ const VisualClipItem: React.FC<{
         blackOverlayOpacity = Math.max(blackOverlayOpacity, 1 - progressIn);
         transitionOpacity *= progressIn;
       } else if (transIn.type === "crossfade") {
+        transitionOpacity *= progressIn;
+      } else if (transIn.type === "directional-wipe") {
+        clipPath = `inset(0 ${(1 - progressIn) * 100}% 0 0)`;
+      } else if (transIn.type === "paper-slide") {
+        transTranslateX = (1 - progressIn) * -120;
+        transitionOpacity *= Math.min(1, progressIn * 1.5);
+      } else if (transIn.type === "paper-stack") {
+        transScale = 0.88 + 0.12 * progressIn;
         transitionOpacity *= progressIn;
       }
     }
@@ -133,6 +148,14 @@ const VisualClipItem: React.FC<{
         transitionOpacity *= 1 - progressOut;
       } else if (transOut.type === "crossfade") {
         transitionOpacity *= 1 - progressOut;
+      } else if (transOut.type === "directional-wipe") {
+        clipPath = `inset(0 0 0 ${progressOut * 100}%)`;
+      } else if (transOut.type === "paper-slide") {
+        transTranslateX = progressOut * 120;
+        transitionOpacity *= 1 - progressOut;
+      } else if (transOut.type === "paper-stack") {
+        transScale = 1 - 0.12 * progressOut;
+        transitionOpacity *= 1 - progressOut;
       }
     }
   }
@@ -142,63 +165,58 @@ const VisualClipItem: React.FC<{
   const cssFilter = buildCssFilter(clip.effects);
   const vignetteIntensity = getVignetteIntensity(clip.effects);
 
+  const posX = (clip.positionX ?? 0) + transTranslateX;
+  const posY = clip.positionY ?? 0;
+  const scale = (clip.scale ?? 1) * transScale;
+  const rotation = clip.rotation ?? 0;
+
   return (
     <AbsoluteFill
       style={{
         justifyContent: "center",
         alignItems: "center",
         opacity: effectiveOpacity,
-        transform: `translate(${clip.positionX ?? 0}px, ${clip.positionY ?? 0}px) scale(${clip.scale ?? 1}) rotate(${clip.rotation ?? 0}deg)`,
+        transform: `translate(${posX}px, ${posY}px) scale(${scale}) rotate(${rotation}deg)`,
+        clipPath,
       }}
     >
-      {clip.type === "video" && (
-        <Video
-          src={clip.src}
-          startFrom={clip.sourceStartFrame}
-          volume={clip.muted ? 0 : (clip.volume ?? 1)}
-          pauseWhenBuffering={false}
-          style={{
-            width: "100%",
-            height: "100%",
-            // eslint-disable-next-line @remotion/no-object-fit-on-media-video
-            objectFit: "contain",
-            filter: cssFilter !== "none" ? cssFilter : undefined,
-          }}
-        />
-      )}
+      <PaperCutoutWrapper effects={clip.effects}>
+        {clip.type === "video" && (
+          <Video
+            src={clip.src}
+            startFrom={clip.sourceStartFrame}
+            volume={clip.muted ? 0 : (clip.volume ?? 1)}
+            pauseWhenBuffering={false}
+            style={{
+              width: "100%",
+              height: "100%",
+              // eslint-disable-next-line @remotion/no-object-fit-on-media-video
+              objectFit: "contain",
+              filter: cssFilter !== "none" ? cssFilter : undefined,
+            }}
+          />
+        )}
 
-      {clip.type === "image" && (
-        <Img
-          src={clip.src}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-            filter: cssFilter !== "none" ? cssFilter : undefined,
-          }}
-        />
-      )}
+        {clip.type === "image" && (
+          <Img
+            src={clip.src}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              filter: cssFilter !== "none" ? cssFilter : undefined,
+            }}
+          />
+        )}
 
-      {clip.type === "text" && (
-        <div
-          style={{
-            fontSize: clip.fontSize ?? 48,
-            fontFamily: clip.fontFamily ?? "sans-serif",
-            fontWeight: clip.fontWeight ?? "bold",
-            fontStyle: clip.fontStyle ?? "normal",
-            color: clip.color ?? "#ffffff",
-            backgroundColor: clip.backgroundColor ?? "transparent",
-            textAlign: clip.textAlign ?? "center",
-            padding: "8px 16px",
-            borderRadius: 4,
-            maxWidth: "80%",
-            wordBreak: "break-word",
-            filter: cssFilter !== "none" ? cssFilter : undefined,
-          }}
-        >
-          {clip.text || clip.name}
-        </div>
-      )}
+        {clip.type === "text" && (
+          <EditorialTypography clip={clip} effects={clip.effects} cssFilter={cssFilter} />
+        )}
+
+        {clip.type === "graphic" && (
+          <DataGraphic data={clip.graphicData} cssFilter={cssFilter} />
+        )}
+      </PaperCutoutWrapper>
 
       {/* Vignette effect overlay */}
       {vignetteIntensity > 0 && (
@@ -266,7 +284,7 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({
     .filter((t) => t.type === "video")
     .forEach((t, idx) => visualTrackOrder.set(t.id, idx));
 
-  // Filter visual clips (video, image, text): exclude clips belonging to hidden tracks
+  // Filter visual clips (video, image, text, graphic): exclude clips belonging to hidden tracks
   const visibleVisualClips = activeClips
     .filter((clip) => {
       if (clip.type === "audio") return false;

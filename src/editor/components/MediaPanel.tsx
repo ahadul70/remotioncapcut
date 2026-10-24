@@ -1,7 +1,18 @@
 import React, { useRef, useState } from "react";
 import { random } from "remotion";
-import { Clip, EffectType, MediaAsset, SidebarTab, TransitionType } from "../state/editorTypes";
+import {
+  Clip,
+  EffectType,
+  GraphicType,
+  MediaAsset,
+  SidebarTab,
+  TransitionType,
+} from "../state/editorTypes";
 import { extractMediaMetadata, validateMediaFile } from "../utils/mediaUtils";
+import {
+  DEFAULT_GRAPHIC_PRESETS,
+  EDITORIAL_TRANSITION_TYPES,
+} from "../utils/editorialRegistry";
 
 type MediaPanelProps = {
   activeTab: SidebarTab;
@@ -13,7 +24,10 @@ type MediaPanelProps = {
   onDragAssetStart?: (asset: MediaAsset) => void;
   selectedClip?: Clip | null;
   onApplyTransition?: (type: TransitionType) => void;
-  onApplyEffectPreset?: (preset: { type: EffectType; value: number }[]) => void;
+  onApplyEffectPreset?: (
+    preset: { type: EffectType; value: number; params?: Record<string, unknown> }[]
+  ) => void;
+  onAddGraphicClip?: (graphicType: GraphicType) => void;
 };
 
 export const MediaPanel: React.FC<MediaPanelProps> = ({
@@ -27,6 +41,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
   selectedClip,
   onApplyTransition,
   onApplyEffectPreset,
+  onAddGraphicClip,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
@@ -168,6 +183,19 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
             <line x1="12" y1="4" x2="12" y2="20" />
           </svg>
           <span>Text</span>
+        </button>
+
+        <button
+          className={`nav-tab-btn ${activeTab === "graphics" ? "active" : ""}`}
+          onClick={() => onTabChange("graphics")}
+          title="Editorial Graphics & Vox Style"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg>
+          <span>Graphics</span>
         </button>
 
         <button
@@ -521,6 +549,109 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
           </div>
         )}
 
+        {activeTab === "graphics" && (
+          <div>
+            <div className="pane-header">
+              <span className="pane-title">Editorial Graphics (Vox Style)</span>
+            </div>
+            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px" }}>
+              Insert business explainer and documentary motion graphic cards directly onto the timeline.
+            </div>
+
+            {/* Explanatory Data Graphics */}
+            <div className="section-label" style={{ marginBottom: "8px" }}>Data & Explanatory Cards</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
+              {DEFAULT_GRAPHIC_PRESETS.map((preset) => (
+                <div
+                  key={preset.type}
+                  style={{
+                    padding: "12px",
+                    background: "var(--bg-elevated)",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--border-color)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)" }}>
+                        {preset.title}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
+                        {preset.description}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "9px", background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", padding: "2px 6px", borderRadius: "3px", fontWeight: 600 }}>
+                      EDITORIAL
+                    </span>
+                  </div>
+
+                  <button
+                    className="btn btn-primary"
+                    style={{ width: "100%", fontSize: "11px", padding: "6px" }}
+                    onClick={() => onAddGraphicClip && onAddGraphicClip(preset.type)}
+                  >
+                    + Add to Timeline
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Physical Paper Styles */}
+            <div className="section-label" style={{ marginBottom: "8px" }}>Physical Paper-Cutout Styles</div>
+            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px" }}>
+              {selectedClip
+                ? `Apply tactile paper physics to "${selectedClip.name}"`
+                : "Select a visual clip or graphic to apply paper styles"}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              {[
+                {
+                  title: "Paper Cutout",
+                  desc: "Matte border & tape",
+                  effects: [{ type: "paper-cutout" as const, value: 70, params: { borderWidth: 8, tiltAngle: -2.5, tapeStyle: "corners" } }],
+                },
+                {
+                  title: "Drop & Settle",
+                  desc: "Mechanical inertia bounce",
+                  effects: [{ type: "drop-settle" as const, value: 65, params: { startOffsetY: 180, settleStrength: 65, durationFrames: 24 } }],
+                },
+                {
+                  title: "Paper Slide Cut",
+                  desc: "Paper reveal wipe",
+                  effects: [{ type: "paper-slide" as const, value: 50, params: { direction: "bottom", durationFrames: 18 } }],
+                },
+                {
+                  title: "Highlighter Sweep",
+                  desc: "Matte yellow reveal",
+                  effects: [{ type: "text-highlight" as const, value: 80, params: { highlightColor: "#fef08a", mode: "sweep" } }],
+                },
+              ].map((stylePreset) => (
+                <button
+                  key={stylePreset.title}
+                  className="btn"
+                  disabled={!selectedClip}
+                  onClick={() => onApplyEffectPreset && onApplyEffectPreset(stylePreset.effects)}
+                  style={{
+                    padding: "10px 8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    gap: "2px",
+                    textAlign: "left",
+                    height: "auto",
+                  }}
+                >
+                  <span style={{ fontSize: "11px", fontWeight: 600 }}>{stylePreset.title}</span>
+                  <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>{stylePreset.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {activeTab === "captions" && (
           <div>
             <div className="pane-header">
@@ -551,11 +682,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
                 : "Select a clip on the timeline to apply transitions"}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {[
-                { type: "crossfade" as const, title: "Cross Dissolve", desc: "Smooth dissolve between clips" },
-                { type: "fade-from-black" as const, title: "Fade from Black", desc: "Intro fade from pure black" },
-                { type: "fade-to-black" as const, title: "Fade to Black", desc: "Outro fade to pure black" },
-              ].map((t) => (
+              {EDITORIAL_TRANSITION_TYPES.map((t) => (
                 <div
                   key={t.type}
                   style={{
@@ -569,8 +696,8 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>{t.title}</div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{t.desc}</div>
+                    <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>{t.label}</div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{t.description}</div>
                   </div>
                   <button
                     className="btn btn-primary"
@@ -589,13 +716,70 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
         {activeTab === "effects" && (
           <div>
             <div className="pane-header">
-              <span className="pane-title">Video Effect Presets</span>
+              <span className="pane-title">Effect Presets</span>
             </div>
             <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px" }}>
               {selectedClip
                 ? `Click to apply visual effect to "${selectedClip.name}"`
                 : "Select a clip on the timeline to apply visual effects"}
             </div>
+
+            {/* Vox Editorial Physical Presets */}
+            <div className="section-label" style={{ marginBottom: "8px" }}>Vox Editorial Physics Presets</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+              {[
+                {
+                  title: "Evidence Document",
+                  effects: [
+                    { type: "paper-cutout" as const, value: 70, params: { borderWidth: 8, tiltAngle: -2.5, tapeStyle: "corners" } },
+                    { type: "drop-settle" as const, value: 65, params: { startOffsetY: 180, settleStrength: 65, durationFrames: 24 } },
+                  ],
+                },
+                {
+                  title: "Paper Slide Cut",
+                  effects: [
+                    { type: "paper-slide" as const, value: 50, params: { direction: "bottom", durationFrames: 18 } },
+                    { type: "contrast" as const, value: 110 },
+                  ],
+                },
+                {
+                  title: "Archival Tape Card",
+                  effects: [
+                    { type: "paper-cutout" as const, value: 80, params: { borderWidth: 10, tiltAngle: 1.8, tapeStyle: "top-center" } },
+                  ],
+                },
+                {
+                  title: "Marker Highlight",
+                  effects: [
+                    { type: "text-highlight" as const, value: 80, params: { highlightColor: "#fef08a", mode: "sweep" } },
+                  ],
+                },
+              ].map((preset) => (
+                <button
+                  key={preset.title}
+                  className="btn"
+                  disabled={!selectedClip}
+                  onClick={() => onApplyEffectPreset && onApplyEffectPreset(preset.effects)}
+                  style={{
+                    padding: "10px 8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "4px",
+                    textAlign: "center",
+                    height: "auto",
+                    borderColor: "rgba(245, 158, 11, 0.4)",
+                  }}
+                >
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#f59e0b" }}>{preset.title}</span>
+                  <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>Vox Preset</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Color & Filter Presets */}
+            <div className="section-label" style={{ marginBottom: "8px" }}>Color & Grading Presets</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
               {[
                 {

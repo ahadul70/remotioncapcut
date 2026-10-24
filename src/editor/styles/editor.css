@@ -597,6 +597,21 @@ body, html, #root {
   border-color: var(--clip-audio-border);
 }
 
+.timeline-clip.graphic {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%);
+  border-color: #3b82f6;
+}
+
+.timeline-clip.text {
+  background: linear-gradient(135deg, #78350f 0%, #1e293b 100%);
+  border-color: #f59e0b;
+}
+
+.timeline-clip.image {
+  background: linear-gradient(135deg, #064e3b 0%, #1e293b 100%);
+  border-color: #10b981;
+}
+
 .timeline-clip.selected {
   border: 2px solid var(--accent);
   box-shadow: 0 0 0 1px var(--accent-hover), 0 2px 8px rgba(139, 124, 255, 0.35);

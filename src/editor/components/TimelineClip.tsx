@@ -86,7 +86,8 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
         const laneTrackId = laneEl.getAttribute("data-track-id");
         const laneTrackType = laneEl.getAttribute("data-track-type");
         const laneIsLocked = laneEl.getAttribute("data-track-locked") === "true";
-        if (laneTrackId && laneTrackType === clip.type && !laneIsLocked) {
+        const isCompatibleLane = laneTrackType === (clip.type === "audio" ? "audio" : "video");
+        if (laneTrackId && isCompatibleLane && !laneIsLocked) {
           targetTrackId = laneTrackId;
         }
       }

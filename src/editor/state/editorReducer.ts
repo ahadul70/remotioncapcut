@@ -3,7 +3,9 @@ import {
   Clip,
   ClipTransition,
   EditorState,
+  EditorialGraphicData,
   EffectType,
+  GraphicType,
   HistorySnapshot,
   MediaAsset,
   Track,
@@ -16,6 +18,9 @@ import {
   getMaxTransitionDuration,
   validateAndClampTransitions,
 } from "../utils/effectAndTransitionUtils";
+import { createGraphicClip, createEffectInstance } from "../utils/editorialRegistry";
+import { AiEditingPlan } from "./aiPlanTypes";
+import { executeAiPlanTransaction } from "../utils/aiPlanEngine";
 
 export type Action =
   | { type: "SET_PLAYHEAD"; frame: number }
@@ -32,9 +37,12 @@ export type Action =
   | { type: "SPLIT_CLIP_AT_PLAYHEAD"; frame?: number }
   | { type: "DELETE_CLIP"; clipId?: string }
   | { type: "UPDATE_CLIP_PROPERTIES"; clipId: string; properties: Partial<Clip> }
-  | { type: "UPDATE_CLIP_EFFECT"; clipId: string; effectType: EffectType; enabled?: boolean; value?: number }
+  | { type: "UPDATE_CLIP_EFFECT"; clipId: string; effectType: EffectType; enabled?: boolean; value?: number; params?: Record<string, unknown> }
+  | { type: "UPDATE_CLIP_EFFECT_PARAMS"; clipId: string; effectType: EffectType; params: Record<string, unknown> }
   | { type: "REMOVE_CLIP_EFFECT"; clipId: string; effectType: EffectType }
   | { type: "RESET_CLIP_EFFECTS"; clipId: string }
+  | { type: "UPDATE_GRAPHIC_DATA"; clipId: string; graphicData: Partial<EditorialGraphicData> }
+  | { type: "ADD_GRAPHIC_CLIP"; graphicType: GraphicType; targetTrackId?: string; startFrame?: number; durationInFrames?: number }
   | { type: "ADD_TRANSITION"; transition: Omit<ClipTransition, "id"> & { id?: string } }
   | { type: "UPDATE_TRANSITION"; id: string; properties: Partial<Omit<ClipTransition, "id">> }
   | { type: "DELETE_TRANSITION"; id: string }
@@ -48,7 +56,8 @@ export type Action =
   | { type: "SET_TOTAL_DURATION"; duration: number }
   | { type: "RENAME_PROJECT"; name: string }
   | { type: "ADD_ASSET"; asset: MediaAsset }
-  | { type: "ADD_ASSETS"; assets: MediaAsset[] };
+  | { type: "ADD_ASSETS"; assets: MediaAsset[] }
+  | { type: "APPLY_AI_PLAN"; plan: AiEditingPlan };
 
 const DEFAULT_MIN_DURATION = 2319; // ~77s default timeline base (covers 2289f TEST.mp4 + 30f padding)
 
@@ -392,21 +401,27 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         const newEnabled = action.enabled !== undefined ? action.enabled : existing.enabled;
         const newValue =
           action.value !== undefined ? clampEffectValue(action.effectType, action.value) : existing.value;
+        const newParams = action.params
+          ? { ...(existing.params || {}), ...action.params }
+          : existing.params;
+
         currentEffects[existingIndex] = {
           ...existing,
           enabled: newEnabled,
           value: newValue,
+          params: newParams,
         };
       } else {
         const newEnabled = action.enabled !== undefined ? action.enabled : true;
         const newValue =
           action.value !== undefined ? clampEffectValue(action.effectType, action.value) : defaultValue;
-        currentEffects.push({
-          id: `eff-${action.effectType}-${Date.now().toString(36)}`,
-          type: action.effectType,
-          enabled: newEnabled,
-          value: newValue,
-        });
+        const newEff = createEffectInstance(action.effectType);
+        newEff.enabled = newEnabled;
+        newEff.value = newValue;
+        if (action.params) {
+          newEff.params = { ...(newEff.params || {}), ...action.params };
+        }
+        currentEffects.push(newEff);
       }
 
       const updatedClips = state.clips.map((c) =>
@@ -415,6 +430,142 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return {
         ...state,
         clips: updatedClips,
+        saveStatus: "unsaved",
+      };
+    }
+
+    case "UPDATE_CLIP_EFFECT_PARAMS": {
+      const clip = state.clips.find((c) => c.id === action.clipId);
+      if (!clip) return state;
+      const currentTrack = state.tracks.find((t) => t.id === clip.trackId);
+      if (currentTrack?.locked) return state;
+
+      const currentEffects = clip.effects ? [...clip.effects] : [];
+      const existingIndex = currentEffects.findIndex((e) => e.type === action.effectType);
+
+      if (existingIndex >= 0) {
+        const existing = currentEffects[existingIndex];
+        currentEffects[existingIndex] = {
+          ...existing,
+          params: {
+            ...(existing.params || {}),
+            ...action.params,
+          },
+        };
+      } else {
+        const newEff = createEffectInstance(action.effectType);
+        newEff.params = {
+          ...(newEff.params || {}),
+          ...action.params,
+        };
+        currentEffects.push(newEff);
+      }
+
+      const updatedClips = state.clips.map((c) =>
+        c.id === action.clipId ? { ...c, effects: currentEffects } : c
+      );
+      return {
+        ...state,
+        clips: updatedClips,
+        saveStatus: "unsaved",
+      };
+    }
+
+    case "UPDATE_GRAPHIC_DATA": {
+      const clip = state.clips.find((c) => c.id === action.clipId);
+      if (!clip) return state;
+      const currentTrack = state.tracks.find((t) => t.id === clip.trackId);
+      if (currentTrack?.locked) return state;
+
+      const currentData = clip.graphicData || { graphicType: "stat-card" };
+      const updatedData: EditorialGraphicData = {
+        ...currentData,
+        ...action.graphicData,
+        comparisonBars: action.graphicData.comparisonBars
+          ? {
+              ...(currentData.comparisonBars || {
+                labelA: "Platform A",
+                valueA: 50,
+                labelB: "Platform B",
+                valueB: 50,
+              }),
+              ...action.graphicData.comparisonBars,
+            }
+          : currentData.comparisonBars,
+        statCard: action.graphicData.statCard
+          ? {
+              ...(currentData.statCard || {
+                value: "100%",
+                label: "STATISTIC",
+              }),
+              ...action.graphicData.statCard,
+            }
+          : currentData.statCard,
+        evidenceCard: action.graphicData.evidenceCard
+          ? {
+              ...(currentData.evidenceCard || {
+                quote: "Evidence excerpt",
+                source: "Source reference",
+              }),
+              ...action.graphicData.evidenceCard,
+            }
+          : currentData.evidenceCard,
+        percentageCard: action.graphicData.percentageCard
+          ? {
+              ...(currentData.percentageCard || {
+                metric: "Percentage Metric",
+                fromValue: 0,
+                toValue: 100,
+              }),
+              ...action.graphicData.percentageCard,
+            }
+          : currentData.percentageCard,
+      };
+
+      const updatedClips = state.clips.map((c) =>
+        c.id === action.clipId ? { ...c, graphicData: updatedData } : c
+      );
+      return {
+        ...state,
+        clips: updatedClips,
+        saveStatus: "unsaved",
+      };
+    }
+
+    case "ADD_GRAPHIC_CLIP": {
+      let targetTrack = action.targetTrackId
+        ? state.tracks.find((t) => t.id === action.targetTrackId && t.type === "video" && !t.locked)
+        : null;
+
+      if (!targetTrack) {
+        targetTrack = state.tracks.find((t) => t.type === "video" && !t.locked) || null;
+      }
+
+      let updatedTracks = state.tracks;
+      if (!targetTrack) {
+        const rand = random(null).toString(36).substring(2, 6);
+        const newTrackId = `track-video-${Date.now().toString(36)}-${rand}`;
+        targetTrack = {
+          id: newTrackId,
+          type: "video",
+          name: `Track ${state.tracks.filter((t) => t.type === "video").length + 1}`,
+        };
+        updatedTracks = [...state.tracks, targetTrack];
+      }
+
+      const startFrame = action.startFrame !== undefined ? action.startFrame : state.currentFrame;
+      const duration = action.durationInFrames || 120;
+      const newClip = createGraphicClip(action.graphicType, targetTrack.id, startFrame, duration);
+
+      const updatedClips = [...state.clips, newClip].sort((a, b) => a.timelineStartFrame - b.timelineStartFrame);
+
+      return {
+        ...state,
+        tracks: updatedTracks,
+        clips: updatedClips,
+        selectedClipId: newClip.id,
+        selectedTransitionId: null,
+        totalDurationInFrames: recalculateDuration(updatedClips, state.totalDurationInFrames),
         saveStatus: "unsaved",
       };
     }
@@ -697,6 +848,15 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         ...state,
         assets: [...state.assets, ...action.assets],
       };
+    }
+
+    case "APPLY_AI_PLAN": {
+      const result = executeAiPlanTransaction(state, action.plan);
+      if (!result.success) {
+        console.warn("AI Plan execution rejected:", result.error);
+        return state;
+      }
+      return result.state;
     }
 
     default:
