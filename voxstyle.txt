@@ -1,0 +1,197 @@
+# Milestone: Reusable Editorial Effects Engine
+
+**Project:** `E:\remotion`  
+**Stack:** Existing React + TypeScript + Remotion project  
+**Goal:** Build the foundation for narration-driven, Vox-style business explainers, documentary editing, paper-cutout animation, editorial graphics, and restrained motion design.
+
+## 1. Inspect before implementing
+
+Inspect the existing project before changing any files.
+
+- Review Git status, recent commits, package.json, and existing editing-state architecture.
+- Inspect the timeline model, effect/property types, Remotion composition, preview, export/rendering path, undo/redo, and existing effect implementations.
+- Identify what already exists and what is missing.
+- Preserve working media import, drag-and-drop, timeline editing, playback, trimming, splitting, snapping, undo/redo, and TEST.mp4 playback.
+- Do not rewrite the project or replace working functionality.
+- Create a Git checkpoint before substantial changes, if the working tree permits it.
+- Present a brief implementation plan based on the actual source code, then proceed with targeted implementation.
+
+## 2. Build a reusable effect system
+
+Create a typed, composable effect architecture compatible with the existing editing model.
+
+Requirements:
+
+- Stable effect IDs and typed effect parameters.
+- Effects attached to clips or appropriate timeline elements.
+- Integer-frame timing and deterministic animation.
+- Editable parameters with sensible defaults and validation.
+- Multiple compatible effects applied in a predictable order.
+- Enable/disable, duplicate, modify, and remove effects.
+- Effect changes integrated into the existing undo/redo history.
+- Effects visible in the preview and correctly included in final Remotion renders.
+- No dependence on wall-clock timers or nondeterministic animation.
+- No effect may introduce editor UI into the exported video.
+- Preserve existing behavior when a clip has no effects.
+
+Inspect the current architecture and reuse its state-management patterns instead of introducing a competing state system.
+
+## 3. Implement these effect families
+
+### A. Physical paper-cutout animation
+
+Build reusable animation primitives for:
+
+- Paper slide and strip reveal.
+- Layered paper stacking.
+- Flip and card replacement.
+- Peel and fold-style reveals.
+- Drop-and-settle motion.
+- Cutout duplication.
+- Route unrolling.
+- Layer separation and restrained parallax.
+- Paper photograph and label reveals.
+
+Support configurable direction, duration, distance, rotation, stagger, and easing where appropriate.
+
+Use matte colours, layered shapes, subtle shadows, and optional texture assets. Preserve physical-looking motion. Do not substitute generic 3D animation, neon effects, holograms, or glossy CGI.
+
+Do not pretend that a CSS transform alone creates realistic paper texture. Use actual assets, layered geometry, or compositing when needed.
+
+### B. Editorial typography
+
+Implement reusable text treatments:
+
+- Key-term reveal.
+- Number or statistic card.
+- Short headline and label.
+- Staggered word or line reveal.
+- Underline and highlight reveal.
+- Comparison labels.
+- Text attached to a graphic or map.
+
+Support font, size, weight, alignment, colour, position, duration, and entrance/exit animation.
+
+Typography must be explicitly added by the editor or an editing instruction. Never automatically convert every spoken sentence into kinetic typography.
+
+### C. Data and explanatory graphics
+
+Provide reusable, parameterized components for:
+
+- Animated comparison bars.
+- Before/after comparisons.
+- Revenue, cost, and profit diagrams.
+- Number cards and percentage changes.
+- Process diagrams.
+- Timelines and simple maps or route diagrams.
+- Evidence cards and image callouts.
+
+Animate the construction, emphasis, and resolution of each graphic. Preserve context when showing numerical comparisons.
+
+Never invent data. Missing or unverified figures must remain visibly marked for verification.
+
+### D. Transitions
+
+Implement a focused initial set:
+
+- Hard cut.
+- Crossfade.
+- Directional wipe.
+- Paper slide.
+- Paper stack or card replacement.
+- Match-style graphic continuation where supported by explicit parameters.
+
+Transitions must have defined timing, direction, and parameters. They must respect adjacent clip boundaries and work correctly during both preview and rendering.
+
+Do not add random zooms, glitch transitions, or gratuitous sound effects.
+
+### E. Motion controls
+
+Provide deterministic, reusable controls for:
+
+- Position and scale.
+- Rotation.
+- Opacity.
+- Easing.
+- Start and end values.
+- Duration and delay.
+- Optional stagger and layered movement.
+
+Use Remotion's frame-based animation mechanisms and existing project conventions.
+
+## 4. Integrate effects into the editor
+
+Inspect the current interface before choosing where to place controls.
+
+Add an Effects browser and a selected-effect properties panel consistent with the existing dark desktop UI.
+
+The user must be able to:
+
+1. Browse available effects.
+2. Apply an effect to a compatible clip or graphic.
+3. Change its parameters.
+4. Preview the result.
+5. Disable or remove it.
+6. Undo and redo changes.
+7. Render the same result in the final video.
+
+Controls must be functional, not decorative.
+
+If the existing timeline supports effect blocks or keyframes, extend that implementation. Otherwise, implement the smallest compatible foundation without rebuilding the timeline.
+
+## 5. Editorial style requirements
+
+The engine must support the following editorial principles:
+
+- Narration-driven timing.
+- Meaningful visual changes synchronized to important words or phrases.
+- A deliberate balance of fast cuts and longer information holds.
+- Evidence-led visual explanations.
+- Creator footage intercut with relevant graphics when required.
+- Consistent typography, accent colours, textures, and recurring visual elements.
+- Setup → development → emphasis → resolution within a scene.
+- Restraint: motion should clarify information rather than merely decorate it.
+
+Do not invent a new visual concept when an existing director's blueprint specifies one. Treat effect presets as execution tools, not replacements for creative direction.
+
+Do not implement AI transcription, external AI APIs, automatic stock-footage sourcing, or backend services in this milestone. Those are separate capabilities.
+
+## 6. Architecture and reliability
+
+- Preserve a clean separation between the editor shell and exported video composition.
+- Keep the preview and export on the same effect-rendering path.
+- Use typed effect definitions and a central registry rather than a large collection of hardcoded conditional branches.
+- Keep effect parameters serializable for future project saving.
+- Avoid unnecessary dependencies.
+- Preserve media import and existing editing operations.
+- Handle invalid parameters and missing assets gracefully.
+- Do not claim support for effects that have not been implemented.
+
+## 7. Testing and delivery
+
+Add automated tests for:
+
+- Effect parameter validation.
+- Frame boundaries and animation timing.
+- Deterministic output for the same input frame.
+- Effect ordering and composition.
+- Clip trimming and splitting with effects.
+- Undo/redo of effect changes.
+- Transition timing at clip boundaries.
+- Preview/export rendering consistency where testable.
+
+Run the available lint, type-check, build, and test commands identified from package.json.
+
+Report:
+
+1. Files changed and architectural decisions.
+2. Effects actually implemented.
+3. Automated tests and their results.
+4. Build results.
+5. Manual browser checks still required.
+6. Any unsupported features or known limitations.
+7. Exact commands to launch and verify the editor.
+
+Do not replace existing features with mock implementations. Do not claim successful browser playback or rendered output unless those have actually been verified.
+
+**Acceptance criterion:** A user can apply and customize a real paper-cutout animation, an editorial text reveal, and a data graphic, preview each, undo and redo the changes, and render the same effects into the final video without editor UI leaking into the composition.
