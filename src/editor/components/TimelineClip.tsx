@@ -6,6 +6,7 @@ import { ClipWaveform } from "./ClipWaveform";
 type TimelineClipProps = {
   clip: Clip;
   zoom: number;
+  fps: number;
   isSelected: boolean;
   isLocked?: boolean;
   onSelect: (id: string) => void;
@@ -23,6 +24,7 @@ type TimelineClipProps = {
 export const TimelineClip: React.FC<TimelineClipProps> = ({
   clip,
   zoom,
+  fps,
   isSelected,
   isLocked,
   onSelect,
@@ -214,7 +216,7 @@ export const TimelineClip: React.FC<TimelineClipProps> = ({
         <span style={{ fontWeight: 600 }}>{clip.name}</span>
         {widthPx > 80 && (
           <span style={{ opacity: 0.7, marginLeft: "6px", fontSize: "10px", fontFamily: "var(--font-mono)" }}>
-            {(clip.durationInFrames / 30).toFixed(1)}s
+            {(clip.durationInFrames / fps).toFixed(1)}s
           </span>
         )}
       </div>

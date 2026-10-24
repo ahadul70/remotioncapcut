@@ -7,6 +7,7 @@ type TimelineTrackProps = {
   track: Track;
   clips: Clip[];
   zoom: number;
+  fps: number;
   selectedClipId: string | null;
   onSelectClip: (id: string) => void;
   onMoveStart: () => void;
@@ -28,6 +29,7 @@ export const TimelineTrack: React.FC<TimelineTrackProps> = ({
   track,
   clips,
   zoom,
+  fps,
   selectedClipId,
   onSelectClip,
   onMoveStart,
@@ -159,6 +161,7 @@ export const TimelineTrack: React.FC<TimelineTrackProps> = ({
           key={clip.id}
           clip={clip}
           zoom={zoom}
+          fps={fps}
           isSelected={clip.id === selectedClipId}
           isLocked={track.locked}
           onSelect={onSelectClip}

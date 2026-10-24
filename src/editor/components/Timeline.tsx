@@ -362,6 +362,7 @@ export const Timeline: React.FC<TimelineProps> = ({
               track={track}
               clips={state.clips}
               zoom={state.zoom}
+              fps={state.fps}
               selectedClipId={state.selectedClipId}
               onSelectClip={onSelectClip}
               onMoveStart={onMoveStart}

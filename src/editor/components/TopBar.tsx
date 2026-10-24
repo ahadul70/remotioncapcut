@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { EditorState } from "../state/editorTypes";
 
 type TopBarProps = {
@@ -24,6 +24,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [projectName, setProjectName] = useState(state.projectName);
+  useEffect(() => setProjectName(state.projectName), [state.projectName]);
 
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +57,12 @@ export const TopBar: React.FC<TopBarProps> = ({
               autoFocus
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              onBlur={() => setIsEditingName(false)}
+              onBlur={() => {
+                if (projectName.trim()) {
+                  onRenameProject(projectName.trim());
+                }
+                setIsEditingName(false);
+              }}
             />
           </form>
         ) : (

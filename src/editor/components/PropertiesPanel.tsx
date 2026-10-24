@@ -4,6 +4,7 @@ import { Clip, Track } from "../state/editorTypes";
 type PropertiesPanelProps = {
   selectedClip: Clip | null;
   tracks: Track[];
+  fps: number;
   onUpdateProperties: (properties: Partial<Clip>) => void;
   onDeleteClip: () => void;
   onSplitClip: () => void;
@@ -13,6 +14,7 @@ type PropertiesPanelProps = {
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   selectedClip,
   tracks,
+  fps,
   onUpdateProperties,
   onDeleteClip,
   onSplitClip,
@@ -115,13 +117,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         <div className="prop-row">
           <span className="prop-label">Timeline Start</span>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: "12px" }}>
-            {selectedClip.timelineStartFrame}f ({(selectedClip.timelineStartFrame / 30).toFixed(2)}s)
+            {selectedClip.timelineStartFrame}f ({(selectedClip.timelineStartFrame / fps).toFixed(2)}s)
           </span>
         </div>
         <div className="prop-row">
           <span className="prop-label">Duration</span>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: "12px" }}>
-            {selectedClip.durationInFrames}f ({(selectedClip.durationInFrames / 30).toFixed(2)}s)
+            {selectedClip.durationInFrames}f ({(selectedClip.durationInFrames / fps).toFixed(2)}s)
           </span>
         </div>
         <div className="prop-row">

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useReducer, useRef } from "react";
 import { PlayerRef } from "@remotion/player";
-import { random, staticFile } from "remotion";
+import { staticFile } from "remotion";
 import { Input, ALL_FORMATS, UrlSource } from "mediabunny";
 
 import { Clip, EditorState, HistorySnapshot, MediaAsset } from "./state/editorTypes";
@@ -355,7 +355,7 @@ export const EditorApp: React.FC = () => {
         try {
           const metadata = await extractMediaMetadata(file, state.fps);
           const objectUrl = URL.createObjectURL(file);
-          const rand = random(null).toString(36).substring(2, 6);
+          const rand = Math.random().toString(36).substring(2, 6);
           const assetId = `asset-${Date.now().toString(36)}-${rand}`;
           const asset: MediaAsset = {
             id: assetId,
@@ -472,7 +472,9 @@ export const EditorApp: React.FC = () => {
       // S: Split selected clip at playhead
       if (e.code === "KeyS" && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
-        handleSplit();
+        if (state.selectedClipId) {
+          handleSplit();
+        }
       }
 
       // Left Arrow: Step back 1 frame
@@ -561,6 +563,7 @@ export const EditorApp: React.FC = () => {
         <PropertiesPanel
           selectedClip={selectedClip}
           tracks={state.tracks}
+          fps={state.fps}
           onUpdateProperties={handleUpdateProperties}
           onDeleteClip={handleDelete}
           onSplitClip={handleSplit}

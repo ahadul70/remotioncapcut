@@ -1,4 +1,3 @@
-import { random } from "remotion";
 import {
   Clip,
   EditorState,
@@ -238,7 +237,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         durationInFrames: firstDuration,
       };
 
-      const secondClipId = `clip-${Date.now().toString(36)}-${random(null).toString(36).substring(2, 6)}`;
+      const secondClipId = `clip-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
       const secondClip: Clip = {
         ...clip,
         id: secondClipId,
@@ -336,7 +335,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const prefix = isVideo ? "track-v" : "track-a";
       let trackId = `${prefix}${nextNum}`;
       while (state.tracks.some((t) => t.id === trackId)) {
-        trackId = `${prefix}${random(null).toString(36).substring(2, 6)}`;
+        trackId = `${prefix}${Math.random().toString(36).substring(2, 6)}`;
       }
 
       const name = isVideo ? `V${nextNum} Video` : `A${nextNum} Audio`;

@@ -1,5 +1,4 @@
 import React, { useRef, useState } from "react";
-import { random } from "remotion";
 import { MediaAsset, SidebarTab } from "../state/editorTypes";
 import { extractMediaMetadata, validateMediaFile } from "../utils/mediaUtils";
 
@@ -48,7 +47,7 @@ export const MediaPanel: React.FC<MediaPanelProps> = ({
       try {
         const metadata = await extractMediaMetadata(file, fps);
         const objectUrl = URL.createObjectURL(file);
-        const rand = random(null).toString(36).substring(2, 6);
+        const rand = Math.random().toString(36).substring(2, 6);
         const assetId = `asset-${Date.now().toString(36)}-${rand}`;
 
         newAssets.push({

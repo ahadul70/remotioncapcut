@@ -1,0 +1,89 @@
+# Step 6: Functional Text and Title Clips
+
+Project: Existing CapCut-style video editor at `E:\remotion`.
+
+## Objective
+Implement real editable text/title clips that can be placed on the timeline, customized through the inspector, positioned in the preview, and rendered correctly through Remotion.
+
+## 1. Inspect first
+- Check Git status, recent commits, package.json, and the existing editor architecture.
+- Inspect editorTypes.ts, editorReducer.ts, EditorApp.tsx, timeline and track components, properties inspector, Composition.tsx, and preview integration.
+- Determine which track types and clip types are currently supported.
+- Preserve existing editing, media import, multitrack, zoom, snapping, and undo/redo functionality.
+- Create a Git checkpoint before substantial changes if the working tree is clean. Do not discard uncommitted work.
+- If a prerequisite from an earlier step is missing, report it before attempting a broad rewrite.
+
+## 2. Text clip data model
+Extend the existing centralized clip model to support a text clip with:
+- Stable unique ID.
+- Track assignment compatible with the current timeline model.
+- Timeline start frame and positive integer duration.
+- Editable text content.
+- Font family, font size, font weight, and font style.
+- Text color and alignment.
+- Optional background color, outline, and shadow.
+- Position and scale relative to the composition dimensions.
+- Optional opacity.
+
+Use integer frames for all timeline timing. Set sensible defaults. Do not create a separate text-editing state system.
+
+## 3. Create and edit text clips
+- Add a functional Add Text action in the existing UI.
+- Create a real timeline clip with a reasonable default duration and select it.
+- Display text clips distinctly on a compatible timeline track.
+- Allow users to edit the text and styling through the existing properties inspector.
+- Ensure property changes update centralized editor state and participate in undo/redo.
+- Make text clips selectable, movable, trimmable, splittable, deletable, and undoable using existing editing actions.
+- Respect locked tracks and existing track constraints.
+- Do not add decorative controls that do not work.
+
+## 4. Preview and positioning
+- Render text in the Remotion composition using the same clip data used by the editor.
+- Text must appear only during its timeline interval.
+- Match the preview to the final rendered composition.
+- Allow users to adjust text position in the preview using a simple drag interaction if feasible within the current architecture.
+- Keep text coordinates consistent with the actual composition dimensions and aspect ratio.
+- If direct preview dragging is too invasive, provide working numeric position controls instead.
+- Keep editor UI, selection outlines, handles, and inspector controls out of the exported video.
+
+## 5. Styling
+Support practical controls for:
+- Text content.
+- Font size and font family.
+- Text color.
+- Alignment.
+- Bold and italic.
+- Background or highlight color.
+- Outline and shadow where feasible.
+- Position and scale.
+- Opacity.
+
+Use safe defaults and prevent long text from overflowing uncontrollably. Do not introduce a large font or animation library for this milestone.
+
+## 6. Rendering
+- Render overlapping text clips at the correct frames.
+- Ensure video track visibility and compositing behavior remain correct.
+- Preserve existing video and audio playback.
+- Confirm text appears in the rendered output and not just in the browser editor UI.
+- Do not claim imported-media CLI export works with blob URLs unless that is actually supported.
+
+## 7. Testing
+Add or update tests for:
+- Creating text clips with valid IDs and frame timing.
+- Editing text properties.
+- Undo/redo for text changes.
+- Splitting and trimming text clips.
+- Text visibility at clip start and end frames.
+- Rendering text without including editor UI.
+- Correct handling of track locking and hidden tracks.
+
+Run the available lint, type-check, automated tests, Vite build, and Remotion build commands after inspecting package.json.
+
+## Scope exclusions
+Do not implement animated text presets, automatic captions, AI-generated text, transitions, advanced effects, or project persistence. Those are separate milestones.
+
+## Final report
+List files changed, functionality implemented, commands and test results, browser tests actually performed, rendering tests actually performed, and known limitations.
+
+## Acceptance criteria
+I can add a text clip, edit its content and styling, place and trim it on the timeline, see it correctly in the preview, and verify that it appears at the correct time in the rendered video. Existing functionality must remain intact.
