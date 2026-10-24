@@ -6,3 +6,8 @@ build
 
 # Ignore the output video from Git but not videos you import into src/.
 out
+
+# Ignore test mp4 files
+public/TEST.mp4
+*TEST*.mp4
+*test*.mp4
